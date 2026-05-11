@@ -1,0 +1,79 @@
+Receitas > Receita de Projeto > Etapa/Parcela
+Receitas > Receita de Projeto > Hora Técnica
+Receitas > Receita de Projeto > Visita Técnica
+Receitas > Receita de Obra > Etapa/Parcela
+Receitas > Receita de Obra > Visita Técnica
+Receitas > Receita de Obra > Reserva Técnica
+Receitas > Receita de Obra > Taxa de Administração
+Receitas > Receitas Bancárias > Rendimento de Aplicação
+Receitas > Reembolso de Despesas >
+Despesas Fixas > Alimentação > Mercado
+Despesas Fixas > Associações > CAU
+Despesas Fixas > Associações > CREA
+Despesas Fixas > Cartório > Taxas
+Despesas Fixas > Contabilidade > Mensalidade
+Despesas Fixas > Contabilidade > Taxas
+Despesas Fixas > Comunicação > Domínios
+Despesas Fixas > Comunicação > Internet
+Despesas Fixas > Comunicação > Site
+Despesas Fixas > Comunicação > Telefone
+Despesas Fixas > Limpeza >
+Despesas Fixas > Material de Copa/Limpeza >
+Despesas Fixas > Material Escritório > Papelaria
+Despesas Fixas > Material Escritório > Hardware
+Despesas Fixas > Predial > Água
+Despesas Fixas > Predial > Aluguel
+Despesas Fixas > Predial > Condomínio
+Despesas Fixas > Predial > Estacionamento
+Despesas Fixas > Predial > IPTU
+Despesas Fixas > Predial > Luz
+Despesas Fixas > Predial > Limpeza
+Despesas Fixas > Software > DOit
+Despesas Fixas > Software > Office
+Despesas Fixas > Veículos > Combustível
+Despesas Fixas > Veículos > IPVA
+Despesas Fixas > Veículos > Multa
+Despesas Fixas > Veículos > Seguro
+Despesas Fixas > Viagens > Alimentação
+Despesas Fixas > Viagens > Aluguel de Carro
+Despesas Fixas > Viagens > Hotel
+Despesas Fixas > Viagens > Kilometragem
+Despesas Fixas > Viagens > Passagens
+Despesas Fixas > Viagens > Pedágio
+Despesas Fixas > Viagens > Táxi/Uber
+Despesas Fixas > Tarifas Bancárias > DOC/TED/PIX
+Despesas Fixas > Tarifas Bancárias > Pacote Mensal
+Despesas Fixas > Tarifas Bancárias > Boletos
+Despesas Fixas > Tarifas Bancárias > Anuidade
+Despesas Variáveis > Consultoria >
+Despesas Variáveis > Copiadora >
+Despesas Variáveis > Correios/Motoboy >
+Despesas Variáveis > Cursos/Treinamentos >
+Despesas Variáveis > Manutenção > Ar Condicionado
+Despesas Variáveis > Manutenção > Equipamentos
+Despesas Variáveis > Marketing > Mídias Sociais
+Despesas Variáveis > Marketing > Agência
+Despesas Variáveis > Reembolso > Alimentação
+Despesas Variáveis > Reembolso > Locomoção
+Custos > Impostos > COFINS
+Custos > Impostos > CSLL
+Custos > Impostos > DAS Simples
+Custos > Impostos > ISS
+Custos > Impostos > PIS
+Custos > Impostos > IRPJ
+Custos > Mão de Obra > Funcionário
+Custos > Mão de Obra > Diretoria
+Custos > Mão de Obra > Férias
+Custos > Mão de Obra > 13º
+Custos > Variável > Free Lancer
+Custos > Variável > Projetista
+Custos > Benefícios > Vale Transporte
+Custos > Benefícios > Vale Refeição
+Custos > Benefícios > Plano de Saúde
+Custos > Encargos > FGTS
+Custos > Encargos > INSS
+Custos > Encargos > IRRF
+Custos > Encargos > GPS
+Saldo Inicial > Saldo Inicial > Saldo Inicial
+Transferência > Caixinha > Caixinha
+Transferência > Entre Contas > Entre Contas

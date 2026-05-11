@@ -1,0 +1,12 @@
+ADMINISTRATIVE_TAX = Taxa Administrativa
+EMPLOYEE_REFUND = Reembolso de Funcionário
+EXPENSE_REFUND = Reembolso de Despesa
+OVERTIME = Hora Extra
+PROJECT_EXPENSE = Despesa de Projeto
+PROJECT_INVOICE = Pedido (Projeto)
+PROJECT_PHASE = Etapa de Projeto
+RESERVE = Reserva Técnica
+SALE_INVOICE = Faturamento
+SERVICE_INVOICE = Serviço
+THIRD_PARTY = Terceiros
+VISITS = Visitas
