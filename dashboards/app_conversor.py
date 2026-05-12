@@ -175,13 +175,66 @@ if uploaded_file is not None:
             # Pós-processamento Outlook (CSV)
             if origem == "outlook":
                 partes_nome = []
-                for col_nome in ["Primeiro nome", "Segundo nome", "Sobrenome"]:
+                for col_nome in ["Primeiro nome", "Segundo nome", "Sobrenome", "Sufixo"]:
                     if col_nome in df_entrada.columns:
                         partes_nome.append(df_entrada[col_nome].fillna(""))
                 if partes_nome:
                     df_entrada["Primeiro nome"] = pd.concat(partes_nome, axis=1).apply(
                         lambda row: " ".join(str(v).strip() for v in row if str(v).strip()), axis=1
                     )
+                # Juntar telefones extras no campo principal (DOit aceita max 4)
+                tel_cols = ["Telefone Comercial", "Telefone Comercial 2", "Telefone principal da empresa",
+                            "Telefone principal", "Telefone do assistente", "Telefone do carro",
+                            "Outro telefone", "Telefone residencial 2"]
+                tel_principais = ["Telefone Comercial", "Telefone residencial", "Telefone celular", "Fax Comercial"]
+                for idx, row_idx in df_entrada.iterrows():
+                    extras_tel = []
+                    for tc in tel_cols:
+                        if tc in df_entrada.columns and tc not in tel_principais:
+                            val = df_entrada.at[idx, tc]
+                            if pd.notna(val) and str(val).strip():
+                                extras_tel.append(str(val).strip())
+                    # Preencher campos vazios dos 4 principais com extras
+                    for tp in tel_principais:
+                        if tp in df_entrada.columns and (pd.isna(df_entrada.at[idx, tp]) or str(df_entrada.at[idx, tp]).strip() == ""):
+                            if extras_tel:
+                                df_entrada.at[idx, tp] = extras_tel.pop(0)
+                    # Se ainda sobrou, concatenar no Fax Comercial
+                    if extras_tel and "Fax Comercial" in df_entrada.columns:
+                        existente = str(df_entrada.at[idx, "Fax Comercial"]).strip() if pd.notna(df_entrada.at[idx, "Fax Comercial"]) else ""
+                        todos = [existente] + extras_tel if existente else extras_tel
+                        df_entrada.at[idx, "Fax Comercial"] = " / ".join(todos)
+                # Juntar campos extras em Anotações
+                colunas_ignorar = {"Tratamento", "Primeiro nome", "Segundo nome", "Sobrenome", "Sufixo",
+                    "Iniciais", "Tipo de email", "Tipo de email 2", "Tipo de email 3",
+                    "Nome para Exibição do Email", "Nome para Exibição do Email 2", "Nome para Exibição do Email 3",
+                    "Particular", "Prioridade", "Sensibilidade", "Sexo", "Birthday", "Datas especiais",
+                    "Disponibilidade da Internet", "Servidor de diretório"}
+                colunas_mapeadas = {"Empresa", "E-mail Address", "Endereço de email 2", "Endereço de email 3",
+                    "Telefone Comercial", "Telefone Comercial 2", "Telefone principal da empresa", "Telefone principal",
+                    "Telefone residencial", "Telefone residencial 2", "Telefone celular", "Fax Comercial",
+                    "Telefone do assistente", "Telefone do carro", "Outro telefone",
+                    "Business Street", "Rua do endereço comercial 2", "Rua do endereço comercial 3",
+                    "Endereço residencial", "Endereço residencial 2", "Endereço residencial 3",
+                    "Business City", "Cidade do endereço residencial", "Business State", "Estado",
+                    "Business Postal Code", "CEP do endereço residencial",
+                    "Anotações", "Página da Web", "Categorias", "Primeiro nome"}
+                pais_cols = {"País/Região da Empresa", "País/Região de Residência"}
+                colunas_mapeadas.update(pais_cols)
+                extras_cols = [c for c in df_entrada.columns if c not in colunas_ignorar and c not in colunas_mapeadas]
+                def _juntar_extras_outlook(row):
+                    partes = []
+                    for col in extras_cols:
+                        val = row.get(col)
+                        if pd.notna(val) and str(val).strip() and str(val).strip().lower() not in ("nan", "false", "normal", "não especificado", "0/0/00", ""):
+                            partes.append(f"{col}: {val}")
+                    return " | ".join(partes)
+                if "Anotações" not in df_entrada.columns:
+                    df_entrada["Anotações"] = ""
+                anotacoes_exist = df_entrada["Anotações"].fillna("").astype(str).str.strip()
+                anotacoes_extras = df_entrada.apply(_juntar_extras_outlook, axis=1)
+                df_entrada["Anotações"] = anotacoes_exist.combine(anotacoes_extras, lambda a, b: f"{a} | {b}" if a and b else (a or b))
+                # Limpar
                 df_entrada = df_entrada.dropna(how="all").reset_index(drop=True)
                 if "Primeiro nome" in df_entrada.columns:
                     df_entrada = df_entrada[df_entrada["Primeiro nome"].str.strip() != ""].reset_index(drop=True)
@@ -298,18 +351,16 @@ if uploaded_file is not None:
                 else:
                     aba_escolhida = abas[0]
                 df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_escolhida)
-                # Concatenar Primeiro nome + Segundo nome + Sobrenome
+                # Mesmo pós-processamento do CSV
                 partes_nome = []
-                for col_nome in ["Primeiro nome", "Segundo nome", "Sobrenome"]:
+                for col_nome in ["Primeiro nome", "Segundo nome", "Sobrenome", "Sufixo"]:
                     if col_nome in df_entrada.columns:
                         partes_nome.append(df_entrada[col_nome].fillna(""))
                 if partes_nome:
                     df_entrada["Primeiro nome"] = pd.concat(partes_nome, axis=1).apply(
                         lambda row: " ".join(str(v).strip() for v in row if str(v).strip()), axis=1
                     )
-                # Remover linhas completamente vazias
                 df_entrada = df_entrada.dropna(how="all").reset_index(drop=True)
-                # Remover linhas sem nome
                 if "Primeiro nome" in df_entrada.columns:
                     df_entrada = df_entrada[df_entrada["Primeiro nome"].str.strip() != ""].reset_index(drop=True)
                 st.info(f"📊 {len(df_entrada)} contatos extraídos do Outlook")
