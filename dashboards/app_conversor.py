@@ -948,13 +948,16 @@ else:
     st.markdown("---")
     st.subheader("📋 Layouts Padrão Disponíveis")
     
-    tab1, tab2, tab3, tab4 = st.tabs(["Contatos", "Projetos", "Financeiro", "Horas"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Contatos", "Projetos", "Financeiro", "Horas", "Usuários", "Produtos", "Vendas"])
     
     modelos_info = {
         'contatos': tab1,
         'projetos': tab2,
         'financeiro': tab3,
         'horas': tab4,
+        'usuarios': tab5,
+        'produtos': tab6,
+        'vendas': tab7,
     }
     
     for tipo_info, tab in modelos_info.items():
