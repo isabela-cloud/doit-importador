@@ -483,6 +483,7 @@ if uploaded_file is not None:
             
             # Sienge e ClickUp: detectar cabeçalho automaticamente (pular metadados no topo)
             elif origem in ('sienge', 'clickup'):
+                uploaded_file.seek(0)
                 df_raw = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), header=None)
                 
                 # Procurar linha com mais colunas preenchidas e palavras-chave
@@ -827,6 +828,43 @@ if uploaded_file is not None:
                                 lambda x: mapa_proj_id.get(str(x).lower().strip(), '') if pd.notna(x) else ''
                             )
             
+            # === REMOVER LINHAS VAZIAS ===
+            # Remover linhas onde todas as colunas importantes estão vazias
+            cols_importantes = [c for c in df_saida.columns if c != "ID"]
+            mask_vazia = df_saida[cols_importantes].apply(
+                lambda row: all(pd.isna(v) or str(v).strip() == "" for v in row), axis=1
+            )
+            df_saida = df_saida[~mask_vazia].reset_index(drop=True)
+            # Recalcular IDs após remoção
+            if "ID" in df_saida.columns:
+                df_saida["ID"] = range(id_inicial, id_inicial + len(df_saida))
+            
+            # === TRATAR R/D (Receita/Despesa) NO FINANCEIRO ===
+            if tipo == "financeiro" and "TIPO" in df_saida.columns and "VALOR" in df_saida.columns:
+                def _tratar_tipo_rd(row):
+                    tipo_val = str(row["TIPO"]).strip().upper() if pd.notna(row["TIPO"]) else ""
+                    if tipo_val in ("D", "DÉBITO", "DEBITO", "DESPESA"):
+                        row["TIPO"] = "Despesa"
+                        # Tornar valor negativo se positivo
+                        try:
+                            val = float(row["VALOR"]) if pd.notna(row["VALOR"]) else 0
+                            if val > 0:
+                                row["VALOR"] = val * -1
+                        except (ValueError, TypeError):
+                            pass
+                    elif tipo_val in ("R", "CRÉDITO", "CREDITO", "RECEITA"):
+                        row["TIPO"] = "Receita"
+                        # Garantir valor positivo
+                        try:
+                            val = float(row["VALOR"]) if pd.notna(row["VALOR"]) else 0
+                            if val < 0:
+                                row["VALOR"] = abs(val)
+                        except (ValueError, TypeError):
+                            pass
+                    return row
+                df_saida = df_saida.apply(_tratar_tipo_rd, axis=1)
+
+
             # Aplicar formatações
             df_saida = _aplicar_formatacoes(df_saida, tipo)
             
