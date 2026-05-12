@@ -78,6 +78,7 @@ origem_opcoes = {
     'Trello': 'trello',
     'Excel Desestruturado': 'excel_desestruturado',
     'Financeiro Horizontal (BPO)': 'financeiro_horizontal',
+    'Outlook (Contatos)': 'outlook',
     'Excel Manual / Outro': 'excel_manual',
 }
 origem_label = st.sidebar.selectbox("🔗 Sistema de origem", list(origem_opcoes.keys()))
@@ -274,6 +275,55 @@ if uploaded_file is not None:
                     st.stop()
             
             # Se for Conta Azul, selecionar aba correta e tratar cabeçalho
+            # Se for Outlook, concatenar nome e tratar colunas
+            elif origem == "outlook":
+                xls = pd.ExcelFile(uploaded_file, engine=_get_engine(uploaded_file.name))
+                abas = xls.sheet_names
+                if len(abas) > 1:
+                    aba_escolhida = st.selectbox("📄 Selecione a aba", abas, key="aba_outlook")
+                else:
+                    aba_escolhida = abas[0]
+                df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_escolhida)
+                # Concatenar Primeiro nome + Segundo nome + Sobrenome
+                partes_nome = []
+                for col_nome in ["Primeiro nome", "Segundo nome", "Sobrenome"]:
+                    if col_nome in df_entrada.columns:
+                        partes_nome.append(df_entrada[col_nome].fillna(""))
+                if partes_nome:
+                    df_entrada["Primeiro nome"] = pd.concat(partes_nome, axis=1).apply(
+                        lambda row: " ".join(str(v).strip() for v in row if str(v).strip()), axis=1
+                    )
+                # Remover linhas completamente vazias
+                df_entrada = df_entrada.dropna(how="all").reset_index(drop=True)
+                # Remover linhas sem nome
+                if "Primeiro nome" in df_entrada.columns:
+                    df_entrada = df_entrada[df_entrada["Primeiro nome"].str.strip() != ""].reset_index(drop=True)
+                st.info(f"📊 {len(df_entrada)} contatos extraídos do Outlook")
+
+
+            # Se for Outlook, concatenar nome e tratar colunas
+            elif origem == "outlook":
+                xls = pd.ExcelFile(uploaded_file, engine=_get_engine(uploaded_file.name))
+                abas = xls.sheet_names
+                if len(abas) > 1:
+                    aba_escolhida = st.selectbox("📄 Selecione a aba", abas, key="aba_outlook")
+                else:
+                    aba_escolhida = abas[0]
+                df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_escolhida)
+                # Concatenar Primeiro nome + Segundo nome + Sobrenome
+                partes_nome = []
+                for col_nome in ["Primeiro nome", "Segundo nome", "Sobrenome"]:
+                    if col_nome in df_entrada.columns:
+                        partes_nome.append(df_entrada[col_nome].fillna(""))
+                if partes_nome:
+                    df_entrada["Primeiro nome"] = pd.concat(partes_nome, axis=1).apply(
+                        lambda row: " ".join(str(v).strip() for v in row if str(v).strip()), axis=1
+                    )
+                # Remover linhas completamente vazias
+                df_entrada = df_entrada.dropna(how="all").reset_index(drop=True)
+                st.info(f"📊 {len(df_entrada)} contatos importados do Outlook")
+
+
             elif origem == 'conta_azul':
                 xls = pd.ExcelFile(uploaded_file, engine=_get_engine(uploaded_file.name))
                 abas = xls.sheet_names
