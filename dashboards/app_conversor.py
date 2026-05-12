@@ -170,7 +170,7 @@ uploaded_file = st.file_uploader(
 if uploaded_file is not None:
     # Ler arquivo
     try:
-        if uploaded_file.name.endswith('.csv'):
+        if uploaded_file.name.lower().endswith('.csv'):
             df_entrada = pd.read_csv(uploaded_file)
             # Pós-processamento Outlook (CSV)
             if origem == "outlook":
