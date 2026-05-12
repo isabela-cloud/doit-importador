@@ -9,6 +9,12 @@ import os
 import sys
 import io
 
+def _get_engine(filename):
+    """Retorna o engine correto para leitura de Excel baseado na extensão."""
+    if filename.endswith(".xls"):
+        return "xlrd"
+    return "openpyxl"
+
 # Adicionar pasta scripts ao path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
 
@@ -172,7 +178,7 @@ if uploaded_file is not None:
             if origem == 'financeiro_horizontal':
                 from parser_bpo import parse_financeiro_horizontal
                 
-                xls = pd.ExcelFile(uploaded_file)
+                xls = pd.ExcelFile(uploaded_file, engine=_get_engine(uploaded_file.name))
                 abas = xls.sheet_names
                 aba_escolhida = st.selectbox("📄 Selecione a aba com o financeiro", abas, key='aba_bpo')
                 
@@ -202,7 +208,7 @@ if uploaded_file is not None:
                 from parser_navis import parse_navis, _detectar_tipo_relatorio
                 import tempfile
                 
-                xls = pd.ExcelFile(uploaded_file)
+                xls = pd.ExcelFile(uploaded_file, engine=_get_engine(uploaded_file.name))
                 abas = xls.sheet_names
                 
                 if len(abas) > 1:
@@ -212,7 +218,7 @@ if uploaded_file is not None:
                 
                 # Detectar tipo de relatório automaticamente
                 uploaded_file.seek(0)
-                df_detect = pd.read_excel(uploaded_file, sheet_name=aba_escolhida, header=None, nrows=15)
+                df_detect = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_escolhida, header=None, nrows=15)
                 tipo_rel_detectado = _detectar_tipo_relatorio(df_detect)
                 
                 # Permitir override manual
@@ -270,7 +276,7 @@ if uploaded_file is not None:
             
             # Se for Conta Azul, selecionar aba correta e tratar cabeçalho
             elif origem == 'conta_azul':
-                xls = pd.ExcelFile(uploaded_file)
+                xls = pd.ExcelFile(uploaded_file, engine=_get_engine(uploaded_file.name))
                 abas = xls.sheet_names
                 
                 # Selecionar aba automaticamente com base no tipo
@@ -287,7 +293,7 @@ if uploaded_file is not None:
                     st.info(f"📄 Aba detectada automaticamente: **{aba_alvo}**")
                 
                 # Ler sem header para detectar cabeçalho real
-                df_raw = pd.read_excel(uploaded_file, sheet_name=aba_alvo, header=None)
+                df_raw = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_alvo, header=None)
                 
                 # Detectar linha de cabeçalho (Conta Azul pode ter linha de índice numérico)
                 palavras_chave_ca = ['descrição', 'valor', 'data', 'tipo', 'categoria', 'situação',
@@ -304,7 +310,7 @@ if uploaded_file is not None:
                         melhor_score = score
                         melhor_linha = i
                 
-                df_entrada = pd.read_excel(uploaded_file, sheet_name=aba_alvo, header=melhor_linha)
+                df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_alvo, header=melhor_linha)
                 
                 # Limpar colunas Unnamed
                 df_entrada = df_entrada.loc[:, df_entrada.columns.notna()]
@@ -336,13 +342,13 @@ if uploaded_file is not None:
             
             # Se for Excel Desestruturado, mostrar seletor de aba e detectar cabeçalho
             elif origem == 'excel_desestruturado':
-                xls = pd.ExcelFile(uploaded_file)
+                xls = pd.ExcelFile(uploaded_file, engine=_get_engine(uploaded_file.name))
                 abas = xls.sheet_names
                 
                 aba_escolhida = st.selectbox("📄 Selecione a aba com os dados", abas, key='aba_desestruturado')
                 
                 # Ler a aba sem header para detectar onde começam os dados
-                df_raw = pd.read_excel(uploaded_file, sheet_name=aba_escolhida, header=None)
+                df_raw = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_escolhida, header=None)
                 
                 # Detectar linha de cabeçalho: procurar a linha com mais texto não-vazio
                 # e que contenha palavras-chave como "nome", "cliente", "projeto", "status", "data"
@@ -368,7 +374,7 @@ if uploaded_file is not None:
                 )
                 
                 # Reler com o header correto
-                df_entrada = pd.read_excel(uploaded_file, sheet_name=aba_escolhida, header=int(header_linha))
+                df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_escolhida, header=int(header_linha))
                 
                 # Limpar colunas sem nome
                 df_entrada = df_entrada.loc[:, df_entrada.columns.notna()]
@@ -403,11 +409,11 @@ if uploaded_file is not None:
                 aba_alvo = abas_por_tipo.get(tipo)
                 
                 # Verificar abas disponíveis
-                xls = pd.ExcelFile(uploaded_file)
+                xls = pd.ExcelFile(uploaded_file, engine=_get_engine(uploaded_file.name))
                 abas_disponiveis = xls.sheet_names
                 
                 if aba_alvo and aba_alvo in abas_disponiveis:
-                    df_entrada = pd.read_excel(uploaded_file, sheet_name=aba_alvo)
+                    df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_alvo)
                 elif aba_alvo:
                     # Tentar match parcial (caso tenha espaço extra ou diferença)
                     aba_encontrada = None
@@ -426,12 +432,12 @@ if uploaded_file is not None:
                             break
                     
                     if aba_encontrada:
-                        df_entrada = pd.read_excel(uploaded_file, sheet_name=aba_encontrada)
+                        df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_encontrada)
                     else:
                         st.warning(f"⚠️ Aba para '{tipo_label}' não encontrada. Abas disponíveis: {abas_disponiveis}")
-                        df_entrada = pd.read_excel(uploaded_file, sheet_name=0)
+                        df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=0)
                 else:
-                    df_entrada = pd.read_excel(uploaded_file, sheet_name=0)
+                    df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=0)
                 
                 # Remover linhas de DESCRIÇÃO e EXEMPLO (verificar na primeira coluna original)
                 if not df_entrada.empty and len(df_entrada.columns) > 0:
@@ -477,7 +483,7 @@ if uploaded_file is not None:
             
             # Sienge e ClickUp: detectar cabeçalho automaticamente (pular metadados no topo)
             elif origem in ('sienge', 'clickup'):
-                df_raw = pd.read_excel(uploaded_file, header=None)
+                df_raw = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), header=None)
                 
                 # Procurar linha com mais colunas preenchidas e palavras-chave
                 palavras_chave_fin = ['data', 'valor', 'histórico', 'documento', 'débito', 'crédito',
@@ -494,17 +500,17 @@ if uploaded_file is not None:
                         melhor_linha = i
                 
                 if melhor_score > 1:
-                    df_entrada = pd.read_excel(uploaded_file, header=melhor_linha)
+                    df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), header=melhor_linha)
                     # Limpar colunas Unnamed
                     df_entrada = df_entrada[[c for c in df_entrada.columns if 'unnamed' not in str(c).lower()]]
                     # Remover linhas vazias
                     df_entrada = df_entrada.dropna(how='all').reset_index(drop=True)
                     st.caption(f"Cabeçalho detectado na linha {melhor_linha + 1}")
                 else:
-                    df_entrada = pd.read_excel(uploaded_file)
+                    df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name))
             
             else:
-                df_entrada = pd.read_excel(uploaded_file)
+                df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name))
     except Exception as e:
         st.error(f"❌ Erro ao ler o arquivo: {e}")
         st.stop()
@@ -868,7 +874,7 @@ if uploaded_file is not None:
         if uploaded_file.name.endswith(('.xlsx', '.xls')):
             try:
                 uploaded_file.seek(0)
-                todas_abas_original = pd.read_excel(uploaded_file, sheet_name=None)
+                todas_abas_original = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=None)
             except Exception:
                 pass
         
