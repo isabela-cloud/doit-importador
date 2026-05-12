@@ -172,6 +172,20 @@ if uploaded_file is not None:
     try:
         if uploaded_file.name.endswith('.csv'):
             df_entrada = pd.read_csv(uploaded_file)
+            # Pós-processamento Outlook (CSV)
+            if origem == "outlook":
+                partes_nome = []
+                for col_nome in ["Primeiro nome", "Segundo nome", "Sobrenome"]:
+                    if col_nome in df_entrada.columns:
+                        partes_nome.append(df_entrada[col_nome].fillna(""))
+                if partes_nome:
+                    df_entrada["Primeiro nome"] = pd.concat(partes_nome, axis=1).apply(
+                        lambda row: " ".join(str(v).strip() for v in row if str(v).strip()), axis=1
+                    )
+                df_entrada = df_entrada.dropna(how="all").reset_index(drop=True)
+                if "Primeiro nome" in df_entrada.columns:
+                    df_entrada = df_entrada[df_entrada["Primeiro nome"].str.strip() != ""].reset_index(drop=True)
+                st.info(f"📊 {len(df_entrada)} contatos extraídos do Outlook")
         else:
             # Se for Financeiro Horizontal (BPO), usar parser especial
             if origem == 'financeiro_horizontal':
