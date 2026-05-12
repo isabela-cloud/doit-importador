@@ -56,6 +56,8 @@ def _detectar_tipo_relatorio(df_raw: pd.DataFrame) -> str:
     
     if 'conta corrente' in texto_topo or 'movimentos de conta' in texto_topo:
         return 'financeiro_cc'
+    elif 'baixados' in texto_topo:
+        return 'financeiro_baixados'
     elif 'contas a pagar' in texto_topo or 'em aberto' in texto_topo:
         return 'financeiro_previsao'
     elif 'consulta projetos' in texto_topo or ('cadastro' in texto_topo and 'projeto' in texto_topo):
@@ -850,6 +852,8 @@ def parse_navis(arquivo: str, sheet_name: str = None, tipo_relatorio: str = None
     
     if tipo_relatorio == 'financeiro_cc':
         return parse_navis_financeiro_cc(arquivo, sheet_name)
+    elif tipo_relatorio == 'financeiro_baixados':
+        return parse_navis_financeiro_baixados(arquivo, sheet_name)
     elif tipo_relatorio == 'financeiro_previsao':
         return parse_navis_financeiro_previsao(arquivo, sheet_name)
     elif tipo_relatorio == 'projetos':
@@ -868,3 +872,140 @@ def parse_navis(arquivo: str, sheet_name: str = None, tipo_relatorio: str = None
             f"Use: 'financeiro_cc', 'financeiro_previsao', 'projetos', "
             f"'clientes', 'fornecedores', 'contatos' ou 'horas'"
         )
+
+
+def parse_navis_financeiro_baixados(arquivo: str, sheet_name: str = None) -> pd.DataFrame:
+    """
+    Parseia relatório 'Contas a Pagar e Receber - Baixados' do Navis.
+    
+    Formato multi-linha similar ao previsão, mas com colunas adicionais:
+    Conta(0), Emissão(6), Vencto(8), Baixa(10), Favorecido/Sacado(11),
+    Classificação Financeira(12), Nº Doc.(15), Tipo Baixa(18), Descr. Baixa(19),
+    V. Bruto(23), Valor(25), R/D(27), Parc.(29), Observações(30)
+    
+    Linhas de continuação: texto adicional nas colunas 11, 12 e/ou 30.
+    """
+    if isinstance(arquivo, str):
+        xls = pd.ExcelFile(arquivo)
+        if sheet_name is None:
+            sheet_name = xls.sheet_names[0]
+        df_raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+    else:
+        df_raw = pd.read_excel(arquivo, sheet_name=sheet_name or 0, header=None)
+    
+    # Detectar cabeçalho
+    palavras_chave = ['conta', 'emissão', 'vencto', 'baixa', 'favorecido', 'sacado',
+                      'classificação', 'nº doc', 'tipo baixa', 'descr', 'v. bruto',
+                      'valor', 'r/d', 'parc', 'observações']
+    header_row = _detectar_cabecalho_navis(df_raw, palavras_chave)
+    
+    # Parsear dados multi-linha
+    registros = []
+    registro_atual = None
+    
+    for i in range(header_row + 1, len(df_raw)):
+        row = df_raw.iloc[i]
+        
+        # Verificar se é linha de dados principal (tem valor na coluna 23 ou 25)
+        valor_bruto = row.iloc[23] if len(row) > 23 and pd.notna(row.iloc[23]) else None
+        conta = row.iloc[0] if len(row) > 0 and pd.notna(row.iloc[0]) else None
+        
+        # Pular linhas de rodapé (empresa, endereço, telefone, email, totais)
+        if conta is not None:
+            conta_str = str(conta).strip().lower()
+            if any(x in conta_str for x in ['total', 'resultado', 'fone', 'e-mail', 'rua ', 'av.', 'rod.']):
+                continue
+        
+        # Contar colunas preenchidas
+        n_preenchidas = sum(1 for v in row if pd.notna(v) and str(v).strip())
+        
+        # Linha principal: tem Conta (col 0) e Valor (col 23)
+        if conta is not None and valor_bruto is not None:
+            # Verificar se não é linha de rodapé com endereço
+            if isinstance(valor_bruto, (int, float)):
+                # Salvar registro anterior
+                if registro_atual is not None:
+                    registros.append(registro_atual)
+                
+                registro_atual = {
+                    'Conta': str(conta).strip(),
+                    'Emissão': row.iloc[6] if len(row) > 6 and pd.notna(row.iloc[6]) else None,
+                    'Vencimento': row.iloc[8] if len(row) > 8 and pd.notna(row.iloc[8]) else None,
+                    'Baixa': row.iloc[10] if len(row) > 10 and pd.notna(row.iloc[10]) else None,
+                    'Favorecido / Sacado': str(row.iloc[11]).strip() if len(row) > 11 and pd.notna(row.iloc[11]) else '',
+                    'Classificação Financeira': str(row.iloc[12]).strip() if len(row) > 12 and pd.notna(row.iloc[12]) else '',
+                    'Nº Doc.': row.iloc[15] if len(row) > 15 and pd.notna(row.iloc[15]) else None,
+                    'Tipo Baixa': str(row.iloc[18]).strip() if len(row) > 18 and pd.notna(row.iloc[18]) else '',
+                    'Descr. Baixa': str(row.iloc[19]).strip() if len(row) > 19 and pd.notna(row.iloc[19]) else '',
+                    'V. Bruto': valor_bruto,
+                    'Valor': row.iloc[25] if len(row) > 25 and pd.notna(row.iloc[25]) else valor_bruto,
+                    'R/D': str(row.iloc[27]).strip() if len(row) > 27 and pd.notna(row.iloc[27]) else '',
+                    'Parc.': str(row.iloc[29]).strip() if len(row) > 29 and pd.notna(row.iloc[29]) else '',
+                    'Observações': str(row.iloc[30]).strip() if len(row) > 30 and pd.notna(row.iloc[30]) else '',
+                }
+                continue
+        
+        # Linha de continuação: poucas colunas preenchidas, sem valor numérico
+        if registro_atual is not None and n_preenchidas <= 4 and valor_bruto is None:
+            # Concatenar Favorecido/Sacado (col 11)
+            if len(row) > 11 and pd.notna(row.iloc[11]):
+                val = str(row.iloc[11]).strip()
+                if val:
+                    registro_atual['Favorecido / Sacado'] += ' ' + val
+            # Concatenar Classificação Financeira (col 12)
+            if len(row) > 12 and pd.notna(row.iloc[12]):
+                val = str(row.iloc[12]).strip()
+                if val:
+                    registro_atual['Classificação Financeira'] += ' ' + val
+            # Concatenar Observações (col 30)
+            if len(row) > 30 and pd.notna(row.iloc[30]):
+                val = str(row.iloc[30]).strip()
+                if val:
+                    registro_atual['Observações'] += ' ' + val
+    
+    # Último registro
+    if registro_atual is not None:
+        registros.append(registro_atual)
+    
+    df = pd.DataFrame(registros)
+    
+    if df.empty:
+        return df
+    
+    # Converter datas
+    df['Emissão'] = pd.to_datetime(df['Emissão'], dayfirst=True, errors='coerce')
+    df['Vencimento'] = pd.to_datetime(df['Vencimento'], dayfirst=True, errors='coerce')
+    df['Baixa'] = pd.to_datetime(df['Baixa'], dayfirst=True, errors='coerce')
+    
+    # Converter R/D para Receita/Despesa e ajustar valor
+    def _ajustar_tipo_valor(row):
+        rd = str(row['R/D']).strip().upper()
+        valor = row['Valor'] if pd.notna(row['Valor']) else 0
+        if rd == 'D':
+            row['Tipo'] = 'Despesa'
+            if isinstance(valor, (int, float)) and valor > 0:
+                row['Valor'] = valor * -1
+        elif rd == 'R':
+            row['Tipo'] = 'Receita'
+            if isinstance(valor, (int, float)) and valor < 0:
+                row['Valor'] = abs(valor)
+        else:
+            row['Tipo'] = rd
+        return row
+    
+    df['Tipo'] = ''
+    df = df.apply(_ajustar_tipo_valor, axis=1)
+    
+    # Limpar espaços extras
+    for col in ['Favorecido / Sacado', 'Classificação Financeira', 'Observações']:
+        if col in df.columns:
+            df[col] = df[col].str.strip()
+    
+    # Remover linhas de rodapé que passaram (empresa, endereço, etc.)
+    if 'Conta' in df.columns:
+        mask_rodape = df['Favorecido / Sacado'].str.contains(
+            r'PROJETOS ESPECIAIS|RUA |AVENIDA|Fone :|E-Mail :', regex=True, na=False
+        ) & df['Classificação Financeira'].eq('')
+        df = df[~mask_rodape].reset_index(drop=True)
+    
+    return df

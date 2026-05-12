@@ -362,17 +362,17 @@ MAPEAMENTOS = {
         },
         'financeiro': {
             # Financeiro CC
-            'DATA': ['Movimento', 'Data movimento'],
+            'DATA': ['Baixa', 'Movimento', 'Data movimento'],
             'EMISSÃO': ['Emissão'],
             'VENCIMENTO': ['Vencimento', 'Bom Para'],
-            'DESCRIÇÃO': ['Descr. / Nro. Cheque', 'Observações'],
+            'DESCRIÇÃO': ['Observações', 'Descr. / Nro. Cheque'],
             'VALOR': ['Valor', 'V. Bruto', 'Valor Liq.'],
             'DI': ['Nro. Doc.', 'Nº Doc.'],
             'TIPO': ['Tipo'],
             'CONCILIADO': ['Conciliado_Texto'],
             'ID DE / PARA': ['Pessoa', 'Favorecido / Sacado'],
             '1ª CATEGORIA': ['Categoria', 'Classificação Financeira'],
-            'FORMA DE PAGAMENTO': ['Baixa/Lancto.'],
+            'FORMA DE PAGAMENTO': ['Descr. Baixa', 'Baixa/Lancto.'],
         },
         'horas': {
             'DATA INICIAL': ['Data'],

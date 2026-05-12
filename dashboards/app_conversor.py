@@ -224,6 +224,7 @@ if uploaded_file is not None:
                 # Permitir override manual
                 opcoes_tipo_navis = {
                     'financeiro_cc': 'Movimentos de Conta Corrente',
+                    'financeiro_baixados': 'Contas a Pagar/Receber (Baixados)',
                     'financeiro_previsao': 'Contas a Pagar/Receber (Previsão)',
                     'projetos': 'Consulta Projetos - Cadastro',
                     'clientes': 'Clientes',
