@@ -107,9 +107,7 @@ id_inicial_contatos = st.sidebar.number_input("Contatos", min_value=1, value=15,
 id_inicial_projetos = st.sidebar.number_input("Projetos", min_value=1, value=2, step=1, key='id_projetos')
 id_inicial_financeiro = st.sidebar.number_input("Financeiro", min_value=1, value=47, step=1, key='id_financeiro')
 id_inicial_horas = st.sidebar.number_input("Horas", min_value=1, value=1, step=1, key='id_horas')
-id_inicial_usuarios = st.sidebar.number_input("Usuários", min_value=1, value=1, step=1, key='id_usuarios')
-id_inicial_produtos = st.sidebar.number_input("Produtos", min_value=1, value=1, step=1, key='id_produtos')
-id_inicial_vendas = st.sidebar.number_input("Vendas", min_value=1, value=1, step=1, key='id_vendas')
+id_inicial_usuarios = st.sidebar.number_input("Usuários", min_value=1, value=9, step=1, key='id_usuarios')
 
 # Selecionar o ID correto para o tipo atual
 id_inicial_map = {
@@ -118,8 +116,8 @@ id_inicial_map = {
     'financeiro': id_inicial_financeiro,
     'horas': id_inicial_horas,
     'usuarios': id_inicial_usuarios,
-    'produtos': id_inicial_produtos,
-    'vendas': id_inicial_vendas,
+    'produtos': 1,
+    'vendas': 1,
 }
 id_inicial = id_inicial_map[tipo]
 
