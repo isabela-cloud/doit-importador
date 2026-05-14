@@ -535,6 +535,9 @@ if uploaded_file is not None:
                     'projetos': 'MODELO DE PROJETOS',
                     'financeiro': 'MODELO FINANCEIRO ',
                     'horas': None,
+                    'usuarios': None,
+                    'produtos': None,
+                    'vendas': None,
                 }
                 aba_alvo = abas_por_tipo.get(tipo)
                 
@@ -605,7 +608,7 @@ if uploaded_file is not None:
                         df_entrada = df_entrada.drop(linhas_exemplo).reset_index(drop=True)
                 
                 # Remover primeira coluna se for None/vazia/índice
-                if df_entrada.columns[0] is None or str(df_entrada.columns[0]).strip() == '' or 'unnamed' in str(df_entrada.columns[0]).lower():
+                if len(df_entrada.columns) > 0 and (df_entrada.columns[0] is None or str(df_entrada.columns[0]).strip() == '' or 'unnamed' in str(df_entrada.columns[0]).lower()):
                     df_entrada = df_entrada.iloc[:, 1:]
                 
                 # Remover linhas completamente vazias
