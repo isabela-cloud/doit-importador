@@ -823,9 +823,6 @@ def _aplicar_formatacoes(df: pd.DataFrame, tipo: str) -> pd.DataFrame:
                     row['PROJ. 2?'] = 'Sim'
                     row['FIN.?'] = 'Sim'
                     row['GERENTE?'] = 'Sim'
-                    row['COMPRAS?'] = 'Sim'
-                    row['FATUR.?'] = 'Sim'
-                    row['VENDAS?'] = 'Sim'
                 
                 # Sócios e financeiro: tudo + gerente + projeto 3 + financeiro
                 if any(p in texto for p in ['sócio', 'socio', 'diretor', 'admin', 'financ', 'gerente', 'gestor']):
@@ -833,9 +830,6 @@ def _aplicar_formatacoes(df: pd.DataFrame, tipo: str) -> pd.DataFrame:
                     row['PROJ. 3?'] = 'Sim'
                     row['FIN.?'] = 'Sim'
                     row['GERENTE?'] = 'Sim'
-                    row['COMPRAS?'] = 'Sim'
-                    row['FATUR.?'] = 'Sim'
-                    row['VENDAS?'] = 'Sim'
                     row['ADMIN?'] = 'Sim'
                 
                 return row
