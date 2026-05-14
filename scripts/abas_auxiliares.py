@@ -445,21 +445,26 @@ def gerar_excel_completo(
         ws_principal = wb[nome_aba_principal]
         _formatar_aba(ws_principal, df_saida)
         
-        # --- Detectar e criar Dados Bancários ---
-        dados_bancarios = detectar_dados_bancarios(
-            df_entrada if df_entrada is not None else pd.DataFrame(),
-            todas_abas
-        )
-        if dados_bancarios:
-            _criar_aba_dados_bancarios(wb, dados_bancarios)
+        # --- Detectar e criar Dados Bancários (apenas financeiro) ---
+        if tipo == 'financeiro':
+            dados_bancarios = detectar_dados_bancarios(
+                df_entrada if df_entrada is not None else pd.DataFrame(),
+                todas_abas
+            )
+            if dados_bancarios:
+                _criar_aba_dados_bancarios(wb, dados_bancarios)
         
-        # --- Detectar e criar Plano de Contas ---
-        df_plano, plano_ok = detectar_plano_contas(
-            df_entrada if df_entrada is not None else pd.DataFrame(),
-            todas_abas
-        )
-        if df_plano is not None and not df_plano.empty:
-            _criar_aba_plano_contas(wb, df_plano, plano_ok)
+        # --- Detectar e criar Plano de Contas (apenas financeiro) ---
+        if tipo == 'financeiro':
+            df_plano, plano_ok = detectar_plano_contas(
+                df_entrada if df_entrada is not None else pd.DataFrame(),
+                todas_abas
+            )
+            if df_plano is not None and not df_plano.empty:
+                _criar_aba_plano_contas(wb, df_plano, plano_ok)
+        else:
+            df_plano = None
+            plano_ok = True
         
         # --- Criar Pendências ---
         df_pendencias = gerar_pendencias(
