@@ -33,7 +33,7 @@ from conversor import (
 # CONFIGURAÇÃO DA PÁGINA
 # ============================================================
 st.set_page_config(
-    page_title="Conversor de Dados - Implantação",
+    page_title="DOit - Conversor de Dados",
     page_icon="🔄",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -41,8 +41,45 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .main .block-container {padding-top: 1rem;}
-    .stSuccess {border-radius: 10px;}
+    .main .block-container { padding-top: 1rem; max-width: 1200px; }
+    h1 { color: #2c3e50; }
+    .stTabs [data-baseweb="tab-list"] { gap: 1.5rem; }
+    .section-header {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .info-box {
+        background: #eef6ff;
+        border-left: 4px solid #3b82f6;
+        border-radius: 6px;
+        padding: 0.8rem 1rem;
+        font-size: 0.85rem;
+        color: #1e40af;
+        margin-bottom: 1rem;
+    }
+    .success-box {
+        background: #ecfdf5;
+        border-left: 4px solid #10b981;
+        border-radius: 6px;
+        padding: 0.8rem 1rem;
+        font-size: 0.85rem;
+        color: #065f46;
+        margin-bottom: 1rem;
+    }
+    .warning-box {
+        background: #fffbeb;
+        border-left: 4px solid #f59e0b;
+        border-radius: 6px;
+        padding: 0.8rem 1rem;
+        font-size: 0.85rem;
+        color: #92400e;
+        margin-bottom: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -53,7 +90,7 @@ LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 if os.path.exists(LOGO_PATH):
     st.sidebar.image(LOGO_PATH, width=100)
 
-st.sidebar.title("🔄 Conversor de Dados")
+st.sidebar.title("⚙️ Configuração")
 
 # Seleção do tipo de dado
 tipo_opcoes = {
@@ -85,7 +122,7 @@ origem_label = st.sidebar.selectbox("🔗 Sistema de origem", list(origem_opcoes
 origem = origem_opcoes[origem_label]
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("⚙️ Configurações")
+st.sidebar.subheader("🔤 Formatação")
 
 # Estilo de caixa
 estilo_caixa_opcao = st.sidebar.radio(
@@ -156,11 +193,12 @@ st.sidebar.markdown("""
 # ============================================================
 # ÁREA PRINCIPAL
 # ============================================================
-st.title("🔄 Conversor de Dados para Implantação")
-st.markdown("Converta arquivos de clientes para o padrão DOit de forma rápida e segura.")
-st.markdown("---")
+st.title("🔄 Conversor de Dados")
+st.markdown('<div class="info-box">Converta arquivos de clientes para o padrão DOit de forma rápida e segura.</div>', unsafe_allow_html=True)
 
 # Upload do arquivo
+st.divider()
+st.markdown('<div class="section-header">📂 Upload do arquivo do cliente</div>', unsafe_allow_html=True)
 uploaded_file = st.file_uploader(
     "📂 Faça upload do arquivo do cliente",
     type=['xlsx', 'xls', 'csv'],
@@ -614,13 +652,13 @@ if uploaded_file is not None:
     with st.expander("👁️ Preview dos dados de entrada", expanded=False):
         st.dataframe(df_entrada.head(10), use_container_width=True)
     
-    st.markdown("---")
+    st.divider()
     
     # ============================================================
     # MAPEAMENTO DE COLUNAS
     # ============================================================
-    st.subheader("🗺️ Mapeamento de Colunas")
-    st.markdown(f"**Padrão:** {tipo_label} | **Origem:** {origem_label}")
+    st.markdown('<div class="section-header">🗺️ Mapeamento de Colunas</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="info-box"><strong>Padrão:</strong> {tipo_label} | <strong>Origem:</strong> {origem_label}</div>', unsafe_allow_html=True)
     
     # Carregar colunas do modelo
     try:
@@ -699,8 +737,8 @@ if uploaded_file is not None:
     # ============================================================
     # PREENCHIMENTO MANUAL DE CAMPOS
     # ============================================================
-    st.subheader("✏️ Preenchimento Manual")
-    st.markdown("Defina valores fixos para campos que o cliente não preenche. Esses valores serão aplicados a **todos** os registros.")
+    st.markdown('<div class="section-header">✏️ Preenchimento Manual</div>', unsafe_allow_html=True)
+    st.caption("Defina valores fixos para campos que o cliente não preenche. Serão aplicados a todos os registros.")
     
     valores_manuais = {}
     
@@ -832,7 +870,9 @@ if uploaded_file is not None:
     # ============================================================
     # CONVERSÃO
     # ============================================================
-    if st.button("🚀 Converter Arquivo", type="primary", use_container_width=True):
+    st.markdown('<div class="section-header">🚀 Conversão</div>', unsafe_allow_html=True)
+
+    if st.button("▶️ Converter Arquivo", type="primary", use_container_width=True):
         with st.spinner("Convertendo..."):
             # Carregar referências se fornecidas
             df_cadastro_ref = None
@@ -972,13 +1012,14 @@ if uploaded_file is not None:
         
         # Mostrar alertas de padronização
         if alertas:
-            st.warning("⚠️ **Valores novos encontrados (não existem no DOit):**")
+            st.markdown('<div class="warning-box">⚠️ <strong>Valores novos encontrados (não existem no DOit):</strong></div>', unsafe_allow_html=True)
             for alerta in alertas:
                 st.markdown(f"- {alerta}")
             st.info("Você precisará criar esses itens no DOit antes de importar.")
         
         # Preview do resultado
-        st.subheader("📊 Preview do Resultado")
+        st.divider()
+        st.markdown('<div class="section-header">📊 Resultado</div>', unsafe_allow_html=True)
         st.dataframe(df_saida.head(20), use_container_width=True)
         
         # Estatísticas
@@ -994,7 +1035,8 @@ if uploaded_file is not None:
             st.metric("Colunas", len(df_saida.columns))
         
         # Download
-        st.markdown("---")
+        st.divider()
+        st.markdown('<div class="section-header">📥 Download</div>', unsafe_allow_html=True)
         
         # Gerar Excel completo com abas auxiliares
         from abas_auxiliares import gerar_excel_completo
@@ -1034,10 +1076,10 @@ if uploaded_file is not None:
 
 else:
     # Estado inicial - mostrar informações dos modelos
-    st.info("👆 Faça upload de um arquivo para começar a conversão.")
+    st.markdown('<div class="info-box">👆 Faça upload de um arquivo para começar a conversão.</div>', unsafe_allow_html=True)
     
-    st.markdown("---")
-    st.subheader("📋 Layouts Padrão Disponíveis")
+    st.divider()
+    st.markdown('<div class="section-header">📋 Layouts Padrão Disponíveis</div>', unsafe_allow_html=True)
     
     tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Contatos", "Projetos", "Financeiro", "Horas", "Usuários", "Produtos", "Vendas"])
     
