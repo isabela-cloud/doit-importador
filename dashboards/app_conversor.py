@@ -122,11 +122,11 @@ origem_label = st.sidebar.selectbox("🔗 Sistema de origem", list(origem_opcoes
 origem = origem_opcoes[origem_label]
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("🔤 Formatação")
+st.sidebar.subheader("Aa Formatação")
 
 # Estilo de caixa
 estilo_caixa_opcao = st.sidebar.radio(
-    "🔤 Estilo de texto",
+    "Estilo de texto",
     ['Primeira Maiúscula', 'TUDO MAIÚSCULO', 'Original (não alterar)'],
     index=0,
     help="Define como os campos de texto serão formatados"
@@ -194,11 +194,11 @@ st.sidebar.markdown("""
 # ÁREA PRINCIPAL
 # ============================================================
 st.title("🔄 Conversor de Dados")
-st.markdown('<div class="info-box">Converta arquivos de clientes para o padrão DOit de forma rápida e segura.</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="info-box">📦 Transforme planilhas de qualquer sistema para o padrão de importação DOit.</div>', unsafe_allow_html=True)
 
 # Upload do arquivo
 st.divider()
-st.markdown('<div class="section-header">📂 Upload do arquivo do cliente</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header">📂 Upload</div>', unsafe_allow_html=True)
 uploaded_file = st.file_uploader(
     "📂 Faça upload do arquivo do cliente",
     type=['xlsx', 'xls', 'csv'],
@@ -1079,28 +1079,28 @@ else:
     st.markdown('<div class="info-box">👆 Faça upload de um arquivo para começar a conversão.</div>', unsafe_allow_html=True)
     
     st.divider()
-    st.markdown('<div class="section-header">📋 Layouts Padrão Disponíveis</div>', unsafe_allow_html=True)
     
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Contatos", "Projetos", "Financeiro", "Horas", "Usuários", "Produtos", "Vendas"])
+    with st.expander("📋 Layouts Padrão Disponíveis", expanded=False):
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Contatos", "Projetos", "Financeiro", "Horas", "Usuários", "Produtos", "Vendas"])
     
-    modelos_info = {
-        'contatos': tab1,
-        'projetos': tab2,
-        'financeiro': tab3,
-        'horas': tab4,
-        'usuarios': tab5,
-        'produtos': tab6,
-        'vendas': tab7,
-    }
+        modelos_info = {
+            'contatos': tab1,
+            'projetos': tab2,
+            'financeiro': tab3,
+            'horas': tab4,
+            'usuarios': tab5,
+            'produtos': tab6,
+            'vendas': tab7,
+        }
     
-    for tipo_info, tab in modelos_info.items():
-        with tab:
-            try:
-                colunas = carregar_modelo(tipo_info)
-                st.markdown(f"**{len(colunas)} colunas:**")
-                cols_display = st.columns(3)
-                for i, col in enumerate(colunas):
-                    with cols_display[i % 3]:
-                        st.markdown(f"• {col}")
-            except Exception as e:
-                st.warning(f"Modelo não disponível: {e}")
+        for tipo_info, tab in modelos_info.items():
+            with tab:
+                try:
+                    colunas = carregar_modelo(tipo_info)
+                    st.markdown(f"**{len(colunas)} colunas:**")
+                    cols_display = st.columns(3)
+                    for i, col in enumerate(colunas):
+                        with cols_display[i % 3]:
+                            st.markdown(f"• {col}")
+                except Exception as e:
+                    st.warning(f"Modelo não disponível: {e}")
