@@ -534,8 +534,8 @@ if uploaded_file is not None:
                     'contatos': 'MODELO DE CONTATOS ',
                     'projetos': 'MODELO DE PROJETOS',
                     'financeiro': 'MODELO FINANCEIRO ',
-                    'horas': None,
-                    'usuarios': None,
+                    'horas': 'MODELO ESTRUTURA DE ATIVIDADES ',
+                    'usuarios': 'INFO USUÁRIOS',
                     'produtos': None,
                     'vendas': None,
                 }
@@ -561,6 +561,9 @@ if uploaded_file is not None:
                             aba_encontrada = aba
                             break
                         elif tipo == 'horas' and ('hora' in aba.lower() or 'atividade' in aba.lower()):
+                            aba_encontrada = aba
+                            break
+                        elif tipo == 'usuarios' and 'usuário' in aba.lower():
                             aba_encontrada = aba
                             break
                     
