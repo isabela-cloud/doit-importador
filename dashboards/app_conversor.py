@@ -1003,8 +1003,32 @@ if uploaded_file is not None:
                 df_saida = df_saida.apply(_tratar_tipo_rd, axis=1)
 
 
+            # Preservar campos originais para lógica de usuários
+            if tipo == 'usuarios':
+                from conversor import _encontrar_coluna
+                col_cargo = _encontrar_coluna(list(df_entrada.columns), ['Cargo', 'CARGO', 'cargo', 'Função', 'função'])
+                col_funcao = _encontrar_coluna(list(df_entrada.columns), ['Função', 'FUNÇÃO', 'função', 'Perfil', 'perfil', 'Nível', 'nível'])
+                col_servidor = _encontrar_coluna(list(df_entrada.columns), ['Servidor do Email', 'SERVIDOR DO EMAIL', 'servidor', 'Servidor', 'Provedor'])
+                
+                if col_cargo:
+                    df_saida['_cargo_original'] = df_entrada[col_cargo].values[:len(df_saida)]
+                else:
+                    df_saida['_cargo_original'] = ''
+                if col_funcao:
+                    df_saida['_funcao_original'] = df_entrada[col_funcao].values[:len(df_saida)]
+                else:
+                    df_saida['_funcao_original'] = ''
+                if col_servidor:
+                    df_saida['_servidor_original'] = df_entrada[col_servidor].values[:len(df_saida)]
+                else:
+                    df_saida['_servidor_original'] = ''
+
             # Aplicar formatações
             df_saida = _aplicar_formatacoes(df_saida, tipo)
+            
+            # Remover colunas auxiliares de usuários
+            if tipo == 'usuarios':
+                df_saida = df_saida.drop(columns=['_cargo_original', '_funcao_original', '_servidor_original'], errors='ignore')
             
             # Aplicar estilo de caixa
             from conversor import _aplicar_caixa, _validar_padronizacoes, _carregar_padronizacoes

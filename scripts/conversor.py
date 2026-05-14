@@ -485,7 +485,10 @@ MAPEAMENTOS = {
             '3ª CATEGORIA': ['3ª CATEGORIA'],
         },
         'horas': {},
-        'usuarios': {},
+        'usuarios': {
+            'NOME': ['NOME', 'Nome'],
+            'EMAIL': ['EMAIL', 'Email', 'E-mail'],
+        },
         'produtos': {},
         'vendas': {},
     },
@@ -732,6 +735,112 @@ def _aplicar_formatacoes(df: pd.DataFrame, tipo: str) -> pd.DataFrame:
         for col in ['INÍCIO', 'EXECUÇÃO', 'TÉRMINO']:
             if col in df.columns:
                 df[col] = df[col].apply(_converter_data)
+    
+    elif tipo == 'usuarios':
+        # LOGIN: primeiro nome em minúsculo
+        if 'LOGIN' in df.columns and 'NOME' in df.columns:
+            df['LOGIN'] = df['NOME'].apply(
+                lambda x: str(x).strip().split()[0].lower() if pd.notna(x) and str(x).strip() else ''
+            )
+        
+        # SENHA: baseada no CARGO/FUNÇÃO
+        if 'SENHA' in df.columns:
+            def _definir_senha(row):
+                cargo = str(row.get('_cargo_original', '')).strip().lower() if pd.notna(row.get('_cargo_original')) else ''
+                funcao = str(row.get('_funcao_original', '')).strip().lower() if pd.notna(row.get('_funcao_original')) else ''
+                texto = cargo + ' ' + funcao
+                # Perfis administrativos/financeiros/sócios → 789
+                if any(p in texto for p in ['admin', 'financ', 'sócio', 'socio', 'diretor', 'gerente', 'gestor', 'coordenador']):
+                    return '789'
+                # Demais (arquitetos, estagiários, designers, etc) → 123
+                return '123'
+            df['SENHA'] = df.apply(_definir_senha, axis=1)
+        
+        # ATIVO: todos ativos
+        if 'ATIVO' in df.columns:
+            df['ATIVO'] = 'Sim'
+        
+        # EMAIL: configurar HOST, PORTA, SSL, TLS, USUÁRIO (SMTP) com base no servidor
+        if 'EMAIL' in df.columns:
+            df['EMAIL'] = df['EMAIL'].apply(lambda x: str(x).strip().lower() if pd.notna(x) and str(x).strip() else '')
+            
+            def _configurar_email(row):
+                email = str(row.get('EMAIL', '')).strip().lower()
+                servidor = str(row.get('_servidor_original', '')).strip().lower() if pd.notna(row.get('_servidor_original')) else ''
+                
+                # Detectar provedor pelo email ou campo servidor
+                host = ''
+                porta = ''
+                ssl = ''
+                tls = ''
+                
+                if 'gmail' in email or 'gmail' in servidor:
+                    host = 'smtp.gmail.com'
+                    porta = '587'
+                    ssl = 'Não'
+                    tls = 'Sim'
+                elif 'outlook' in email or 'hotmail' in email or 'outlook' in servidor or 'microsoft' in servidor:
+                    host = 'smtp.office365.com'
+                    porta = '587'
+                    ssl = 'Não'
+                    tls = 'Sim'
+                elif 'yahoo' in email or 'yahoo' in servidor:
+                    host = 'smtp.mail.yahoo.com'
+                    porta = '465'
+                    ssl = 'Sim'
+                    tls = 'Não'
+                elif email:
+                    # Domínio próprio: smtp.dominio.com
+                    dominio = email.split('@')[1] if '@' in email else ''
+                    if dominio:
+                        host = f'smtp.{dominio}'
+                        porta = '587'
+                        ssl = 'Não'
+                        tls = 'Sim'
+                
+                row['HOST'] = host
+                row['PORTA'] = porta
+                row['USAR SSL'] = ssl
+                row['USAR TLS'] = tls
+                row['USUÁRIO (SMTP)'] = email
+                return row
+            
+            df = df.apply(_configurar_email, axis=1)
+        
+        # PERMISSÕES: baseadas na FUNÇÃO
+        if 'BASICO?' in df.columns:
+            def _configurar_permissoes(row):
+                funcao = str(row.get('_funcao_original', '')).strip().lower() if pd.notna(row.get('_funcao_original')) else ''
+                cargo = str(row.get('_cargo_original', '')).strip().lower() if pd.notna(row.get('_cargo_original')) else ''
+                texto = funcao + ' ' + cargo
+                
+                # Todos têm básico e projeto 1
+                row['BASICO?'] = 'Sim'
+                row['PROJ. 1?'] = 'Sim'
+                
+                # Líderes: tudo + projeto 2
+                if any(p in texto for p in ['líder', 'lider', 'coordenador', 'supervisor']):
+                    row['PROJ. 2?'] = 'Sim'
+                    row['FIN.?'] = 'Sim'
+                    row['GERENTE?'] = 'Sim'
+                    row['COMPRAS?'] = 'Sim'
+                    row['FATUR.?'] = 'Sim'
+                    row['VENDAS?'] = 'Sim'
+                
+                # Sócios e financeiro: tudo + gerente + projeto 3 + financeiro
+                if any(p in texto for p in ['sócio', 'socio', 'diretor', 'admin', 'financ', 'gerente', 'gestor']):
+                    row['PROJ. 2?'] = 'Sim'
+                    row['PROJ. 3?'] = 'Sim'
+                    row['FIN.?'] = 'Sim'
+                    row['GERENTE?'] = 'Sim'
+                    row['COMPRAS?'] = 'Sim'
+                    row['FATUR.?'] = 'Sim'
+                    row['VENDAS?'] = 'Sim'
+                    row['ADMIN?'] = 'Sim'
+                
+                return row
+            
+            df = df.apply(_configurar_permissoes, axis=1)
     
     return df
 
