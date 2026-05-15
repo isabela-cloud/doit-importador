@@ -908,13 +908,39 @@ if uploaded_file is not None:
                     mask = df_saida[campo].apply(lambda x: pd.isna(x) or str(x).strip() == '')
                     df_saida.loc[mask, campo] = valor
             
-            # Campos extras → Anotações
-            if tipo == 'contatos' and 'ANOTAÇÕES' in df_saida.columns:
-                from conversor import _campos_extras_para_anotacoes
-                anotacoes_extras = _campos_extras_para_anotacoes(df_entrada, mapeamento_final, colunas_padrao)
-                existente = df_saida['ANOTAÇÕES'].apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() else '')
-                df_saida['ANOTAÇÕES'] = existente.combine(anotacoes_extras,
+            # Campos extras → Anotações (dados preenchidos que não foram mapeados)
+            from conversor import _campos_extras_para_anotacoes
+            anotacoes_extras = _campos_extras_para_anotacoes(df_entrada, mapeamento_final, colunas_padrao)
+            
+            # Encontrar coluna de anotações no modelo de saída
+            col_anotacoes = None
+            for col_candidata in ['ANOTAÇÕES', 'DESCRIÇÃO', 'OBSERVAÇÕES']:
+                if col_candidata in df_saida.columns:
+                    col_anotacoes = col_candidata
+                    break
+            
+            if col_anotacoes:
+                existente = df_saida[col_anotacoes].apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() else '')
+                df_saida[col_anotacoes] = existente.combine(anotacoes_extras,
                     lambda a, b: f"{a} | {b}" if a and b else (a or b))
+            
+            # Alertar sobre dados não mapeados que tinham conteúdo
+            colunas_usadas = set(mapeamento_final.values())
+            colunas_nao_mapeadas_com_dados = []
+            for col in df_entrada.columns:
+                if col not in colunas_usadas:
+                    preenchidos = df_entrada[col].dropna()
+                    preenchidos = preenchidos[preenchidos.astype(str).str.strip() != '']
+                    if len(preenchidos) > 0:
+                        colunas_nao_mapeadas_com_dados.append((col, len(preenchidos)))
+            
+            if colunas_nao_mapeadas_com_dados:
+                st.warning(
+                    f"⚠️ **{len(colunas_nao_mapeadas_com_dados)} coluna(s) com dados não foram mapeadas** "
+                    f"(os valores foram salvos em '{col_anotacoes or 'nenhum campo'}'):"
+                )
+                for col_nome, qtd in colunas_nao_mapeadas_com_dados:
+                    st.markdown(f"  - **{col_nome}** ({qtd} registro{'s' if qtd > 1 else ''} preenchido{'s' if qtd > 1 else ''})")
             
             # Vincular IDs
             if tipo == 'projetos' and df_cadastro_ref is not None and 'ID DO CADASTRO' in df_saida.columns:
