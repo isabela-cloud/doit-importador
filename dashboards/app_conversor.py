@@ -943,21 +943,49 @@ if uploaded_file is not None:
                     st.markdown(f"  - **{col_nome}** ({qtd} registro{'s' if qtd > 1 else ''} preenchido{'s' if qtd > 1 else ''})")
             
             # Vincular IDs
-            if tipo == 'projetos' and df_cadastro_ref is not None and 'ID DO CADASTRO' in df_saida.columns:
-                if 'NOME' in df_cadastro_ref.columns:
+            if tipo == 'projetos' and 'ID DO CADASTRO' in df_saida.columns:
+                from conversor import _encontrar_coluna
+                col_cliente_origem = _encontrar_coluna(
+                    list(df_entrada.columns),
+                    ['Cliente', 'cliente', 'CLIENTE', 'Card Name', 'Nome do Cliente', 'Razão Social', 'Nome']
+                )
+                
+                if df_cadastro_ref is not None and 'NOME' in df_cadastro_ref.columns:
                     mapa_nome_id = dict(zip(
                         df_cadastro_ref['NOME'].str.lower().str.strip(),
                         df_cadastro_ref['ID']
                     ))
-                    from conversor import _encontrar_coluna
-                    col_cliente_origem = _encontrar_coluna(
-                        list(df_entrada.columns),
-                        ['Cliente', 'cliente', 'CLIENTE', 'Card Name', 'Nome do Cliente', 'Razão Social', 'Nome']
-                    )
                     if col_cliente_origem:
                         df_saida['ID DO CADASTRO'] = df_entrada[col_cliente_origem].apply(
                             lambda x: mapa_nome_id.get(str(x).lower().strip(), '') if pd.notna(x) else ''
                         )
+                        
+                        # Alertar clientes não encontrados no cadastro
+                        clientes_origem = df_entrada[col_cliente_origem].dropna()
+                        clientes_origem = clientes_origem[clientes_origem.astype(str).str.strip() != '']
+                        nao_encontrados = [
+                            str(c).strip() for c in clientes_origem
+                            if str(c).lower().strip() not in mapa_nome_id
+                        ]
+                        nao_encontrados_unicos = sorted(set(nao_encontrados))
+                        if nao_encontrados_unicos:
+                            st.error(
+                                f"🚨 **{len(nao_encontrados_unicos)} cliente(s) não encontrado(s) no cadastro de referência** "
+                                f"(o campo ID DO CADASTRO ficará vazio para esses projetos):"
+                            )
+                            for nome_cli in nao_encontrados_unicos:
+                                st.markdown(f"  - {nome_cli}")
+                            st.info("Verifique se esses clientes estão no cadastro convertido ou adicione-os antes de importar.")
+                else:
+                    # Sem cadastro de referência - alertar se há clientes preenchidos
+                    if col_cliente_origem:
+                        clientes_preenchidos = df_entrada[col_cliente_origem].dropna()
+                        clientes_preenchidos = clientes_preenchidos[clientes_preenchidos.astype(str).str.strip() != '']
+                        if len(clientes_preenchidos) > 0:
+                            st.warning(
+                                f"⚠️ **{len(clientes_preenchidos)} projeto(s) têm cliente preenchido** mas nenhum cadastro de referência foi enviado. "
+                                f"Faça upload do cadastro convertido na sidebar para vincular os IDs."
+                            )
             
             if tipo == 'financeiro':
                 if df_cadastro_ref is not None and 'ID DE / PARA' in df_saida.columns:
@@ -975,6 +1003,18 @@ if uploaded_file is not None:
                             df_saida['ID DE / PARA'] = df_entrada[col_cliente_origem].apply(
                                 lambda x: mapa_nome_id.get(str(x).lower().strip(), '') if pd.notna(x) else ''
                             )
+                            
+                            # Alertar não encontrados
+                            nomes_origem = df_entrada[col_cliente_origem].dropna()
+                            nomes_origem = nomes_origem[nomes_origem.astype(str).str.strip() != '']
+                            nao_encontrados = sorted(set(
+                                str(c).strip() for c in nomes_origem
+                                if str(c).lower().strip() not in mapa_nome_id
+                            ))
+                            if nao_encontrados:
+                                st.error(f"🚨 **{len(nao_encontrados)} cadastro(s) não encontrado(s)** (ID DE / PARA ficará vazio):")
+                                for nome in nao_encontrados[:20]:
+                                    st.markdown(f"  - {nome}")
                 
                 if df_projetos_ref is not None and 'ID PROJETO' in df_saida.columns:
                     if 'NOME' in df_projetos_ref.columns:
@@ -991,6 +1031,18 @@ if uploaded_file is not None:
                             df_saida['ID PROJETO'] = df_entrada[col_projeto_origem].apply(
                                 lambda x: mapa_proj_id.get(str(x).lower().strip(), '') if pd.notna(x) else ''
                             )
+                            
+                            # Alertar não encontrados
+                            projs_origem = df_entrada[col_projeto_origem].dropna()
+                            projs_origem = projs_origem[projs_origem.astype(str).str.strip() != '']
+                            nao_encontrados_proj = sorted(set(
+                                str(c).strip() for c in projs_origem
+                                if str(c).lower().strip() not in mapa_proj_id
+                            ))
+                            if nao_encontrados_proj:
+                                st.error(f"🚨 **{len(nao_encontrados_proj)} projeto(s) não encontrado(s)** (ID PROJETO ficará vazio):")
+                                for nome in nao_encontrados_proj[:20]:
+                                    st.markdown(f"  - {nome}")
             
             # === REMOVER LINHAS VAZIAS ===
             # Remover linhas onde todas as colunas importantes estão vazias
