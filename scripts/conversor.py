@@ -818,13 +818,19 @@ def _aplicar_formatacoes(df: pd.DataFrame, tipo: str) -> pd.DataFrame:
                 row['BASICO?'] = 'Sim'
                 row['PROJ. 1?'] = 'Sim'
                 
-                # Líderes: tudo + projeto 2
+                # Explicitamente NÃO liberar compras, faturamento e vendas
+                row['COMPRAS?'] = 'Não'
+                row['FATUR.?'] = 'Não'
+                row['VENDAS?'] = 'Não'
+                row['VENDEDOR?'] = 'Não'
+                
+                # Líderes: + projeto 2 + financeiro + gerente
                 if any(p in texto for p in ['líder', 'lider', 'coordenador', 'supervisor']):
                     row['PROJ. 2?'] = 'Sim'
                     row['FIN.?'] = 'Sim'
                     row['GERENTE?'] = 'Sim'
                 
-                # Sócios e financeiro: tudo + gerente + projeto 3 + financeiro
+                # Sócios e financeiro: + gerente + projeto 3 + admin
                 if any(p in texto for p in ['sócio', 'socio', 'diretor', 'admin', 'financ', 'gerente', 'gestor']):
                     row['PROJ. 2?'] = 'Sim'
                     row['PROJ. 3?'] = 'Sim'
