@@ -818,12 +818,6 @@ def _aplicar_formatacoes(df: pd.DataFrame, tipo: str) -> pd.DataFrame:
                 row['BASICO?'] = 'Sim'
                 row['PROJ. 1?'] = 'Sim'
                 
-                # Explicitamente NÃO liberar compras, faturamento e vendas
-                row['COMPRAS?'] = 'Não'
-                row['FATUR.?'] = 'Não'
-                row['VENDAS?'] = 'Não'
-                row['VENDEDOR?'] = 'Não'
-                
                 # Líderes: + projeto 2 + financeiro + gerente
                 if any(p in texto for p in ['líder', 'lider', 'coordenador', 'supervisor']):
                     row['PROJ. 2?'] = 'Sim'
