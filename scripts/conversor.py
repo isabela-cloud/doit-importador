@@ -1209,6 +1209,7 @@ def _carregar_padronizacoes():
     arquivos_padrao = {
         'classificacoes_cadastro': 'classificacoes_cadastro',
         'categorias_projeto': 'categorias_projeto',
+        'status_projeto': 'status_projeto',
         'categorias_financeiro': 'categorias_financeiro',
         'departamentos_financeiro': 'departamentos_financeiro',
         'formas_pagamento': 'formas_pagamento',
@@ -1287,6 +1288,15 @@ def _validar_padronizacoes(df: pd.DataFrame, tipo: str, padronizacoes: dict) -> 
                 val_str = str(val).strip()
                 if val_str and val_str.lower() not in valores_validos:
                     alertas.append(f"📂 Categoria de projeto nova: **{val_str}** (não existe no DOit)")
+        
+        # Validar status de projeto
+        if 'status_projeto' in padronizacoes and 'STATUS' in df.columns:
+            valores_validos = [v.lower() for v in padronizacoes['status_projeto']]
+            valores_usados = df['STATUS'].dropna().unique()
+            for val in valores_usados:
+                val_str = str(val).strip()
+                if val_str and val_str.lower() not in valores_validos:
+                    alertas.append(f"📋 Status de projeto novo: **{val_str}** (não existe no DOit)")
     
     if tipo == 'financeiro':
         # Validar departamento
