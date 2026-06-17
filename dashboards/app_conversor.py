@@ -242,6 +242,10 @@ id_inicial = id_inicial_map[tipo]
 cadastro_ref_file = None
 projetos_ref_file = None
 usuarios_ref_file = None
+compras_ref_file = None
+recebimentos_ref_file = None
+faturas_servico_ref_file = None
+faturas_ref_file = None
 
 if tipo in ['projetos', 'financeiro']:
     st.sidebar.subheader("🔗 Vincular IDs")
@@ -249,7 +253,7 @@ if tipo in ['projetos', 'financeiro']:
         "Cadastro convertido (para ID)",
         type=['xlsx'],
         key='cadastro_ref',
-        help="Upload do cadastro já convertido para vincular ID DO CADASTRO"
+        help="Upload do cadastro já convertido para vincular ID DO CADASTRO / ID DE PARA"
     )
 
 if tipo == 'projetos':
@@ -262,10 +266,34 @@ if tipo == 'projetos':
 
 if tipo == 'financeiro':
     projetos_ref_file = st.sidebar.file_uploader(
-        "Projetos convertido (para ID)",
+        "Projetos convertido (para ID Projeto)",
         type=['xlsx'],
         key='projetos_ref',
         help="Upload dos projetos já convertidos para vincular ID PROJETO"
+    )
+    compras_ref_file = st.sidebar.file_uploader(
+        "Compras convertido (para ID Compra)",
+        type=['xlsx'],
+        key='compras_ref',
+        help="Upload das compras já convertidas para vincular ID COMPRA"
+    )
+    recebimentos_ref_file = st.sidebar.file_uploader(
+        "Recebimentos convertido (para ID Recebimento)",
+        type=['xlsx'],
+        key='recebimentos_ref',
+        help="Upload dos recebimentos já convertidos para vincular ID RECEBIMENTO"
+    )
+    faturas_servico_ref_file = st.sidebar.file_uploader(
+        "Faturas de Serviço convertido (para ID Fatura Serviço)",
+        type=['xlsx'],
+        key='faturas_servico_ref',
+        help="Upload das faturas de serviço já convertidas para vincular ID FATURA DE SERVIÇO"
+    )
+    faturas_ref_file = st.sidebar.file_uploader(
+        "Faturas convertido (para ID Fatura)",
+        type=['xlsx'],
+        key='faturas_ref',
+        help="Upload das faturas já convertidas para vincular ID FATURA"
     )
 
 st.sidebar.markdown("---")
@@ -1315,6 +1343,86 @@ if uploaded_file is not None:
                                 st.error(f"🚨 **{len(nao_encontrados_proj)} projeto(s) não encontrado(s)** (ID PROJETO ficará vazio):")
                                 for nome in nao_encontrados_proj[:20]:
                                     st.markdown(f"  - {nome}")
+                
+                # Vincular ID COMPRA
+                if compras_ref_file is not None and 'ID COMPRA' in df_saida.columns:
+                    df_compras_ref = pd.read_excel(compras_ref_file)
+                    if 'NOME' in df_compras_ref.columns or 'DESCRIÇÃO' in df_compras_ref.columns:
+                        col_ref = 'NOME' if 'NOME' in df_compras_ref.columns else 'DESCRIÇÃO'
+                        id_col = 'ID' if 'ID' in df_compras_ref.columns else df_compras_ref.columns[0]
+                        mapa_compra = dict(zip(
+                            df_compras_ref[col_ref].astype(str).str.lower().str.strip(),
+                            df_compras_ref[id_col]
+                        ))
+                        from conversor import _encontrar_coluna
+                        col_compra_origem = _encontrar_coluna(
+                            list(df_entrada.columns),
+                            ['Compra', 'compra', 'COMPRA', 'Pedido', 'pedido', 'Ordem de Compra', 'OC']
+                        )
+                        if col_compra_origem:
+                            df_saida['ID COMPRA'] = df_entrada[col_compra_origem].apply(
+                                lambda x: mapa_compra.get(str(x).lower().strip(), '') if pd.notna(x) else ''
+                            )
+                
+                # Vincular ID RECEBIMENTO
+                if recebimentos_ref_file is not None and 'ID RECEBIMENTO' in df_saida.columns:
+                    df_receb_ref = pd.read_excel(recebimentos_ref_file)
+                    if 'NOME' in df_receb_ref.columns or 'DESCRIÇÃO' in df_receb_ref.columns:
+                        col_ref = 'NOME' if 'NOME' in df_receb_ref.columns else 'DESCRIÇÃO'
+                        id_col = 'ID' if 'ID' in df_receb_ref.columns else df_receb_ref.columns[0]
+                        mapa_receb = dict(zip(
+                            df_receb_ref[col_ref].astype(str).str.lower().str.strip(),
+                            df_receb_ref[id_col]
+                        ))
+                        from conversor import _encontrar_coluna
+                        col_receb_origem = _encontrar_coluna(
+                            list(df_entrada.columns),
+                            ['Recebimento', 'recebimento', 'RECEBIMENTO', 'NF Entrada', 'Nota Entrada']
+                        )
+                        if col_receb_origem:
+                            df_saida['ID RECEBIMENTO'] = df_entrada[col_receb_origem].apply(
+                                lambda x: mapa_receb.get(str(x).lower().strip(), '') if pd.notna(x) else ''
+                            )
+                
+                # Vincular ID FATURA DE SERVIÇO
+                if faturas_servico_ref_file is not None and 'ID FATURA DE SERVIÇO' in df_saida.columns:
+                    df_fat_serv_ref = pd.read_excel(faturas_servico_ref_file)
+                    if 'NOME' in df_fat_serv_ref.columns or 'DESCRIÇÃO' in df_fat_serv_ref.columns:
+                        col_ref = 'NOME' if 'NOME' in df_fat_serv_ref.columns else 'DESCRIÇÃO'
+                        id_col = 'ID' if 'ID' in df_fat_serv_ref.columns else df_fat_serv_ref.columns[0]
+                        mapa_fat_serv = dict(zip(
+                            df_fat_serv_ref[col_ref].astype(str).str.lower().str.strip(),
+                            df_fat_serv_ref[id_col]
+                        ))
+                        from conversor import _encontrar_coluna
+                        col_fat_serv_origem = _encontrar_coluna(
+                            list(df_entrada.columns),
+                            ['Fatura Serviço', 'NFS', 'Nota de Serviço', 'Fatura de Serviço', 'NF Serviço']
+                        )
+                        if col_fat_serv_origem:
+                            df_saida['ID FATURA DE SERVIÇO'] = df_entrada[col_fat_serv_origem].apply(
+                                lambda x: mapa_fat_serv.get(str(x).lower().strip(), '') if pd.notna(x) else ''
+                            )
+                
+                # Vincular ID FATURA
+                if faturas_ref_file is not None and 'ID FATURA' in df_saida.columns:
+                    df_fat_ref = pd.read_excel(faturas_ref_file)
+                    if 'NOME' in df_fat_ref.columns or 'DESCRIÇÃO' in df_fat_ref.columns:
+                        col_ref = 'NOME' if 'NOME' in df_fat_ref.columns else 'DESCRIÇÃO'
+                        id_col = 'ID' if 'ID' in df_fat_ref.columns else df_fat_ref.columns[0]
+                        mapa_fat = dict(zip(
+                            df_fat_ref[col_ref].astype(str).str.lower().str.strip(),
+                            df_fat_ref[id_col]
+                        ))
+                        from conversor import _encontrar_coluna
+                        col_fat_origem = _encontrar_coluna(
+                            list(df_entrada.columns),
+                            ['Fatura', 'fatura', 'FATURA', 'NF', 'Nota Fiscal', 'Invoice']
+                        )
+                        if col_fat_origem:
+                            df_saida['ID FATURA'] = df_entrada[col_fat_origem].apply(
+                                lambda x: mapa_fat.get(str(x).lower().strip(), '') if pd.notna(x) else ''
+                            )
             
             # === REMOVER LINHAS VAZIAS (safety net final) ===
             # Remover linhas onde todas as colunas exceto ID e valores manuais estão vazias
