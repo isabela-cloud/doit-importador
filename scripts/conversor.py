@@ -23,6 +23,92 @@ warnings.filterwarnings('ignore')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELOS_DIR = os.path.join(BASE_DIR, '..', 'models')
 
+
+# ============================================================
+# CORREÇÃO DE ENCODING (MOJIBAKE)
+# ============================================================
+
+def _corrigir_encoding_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Corrige problemas de encoding (mojibake) em DataFrames.
+    Detecta e corrige textos como 'RazÃ£o Social' → 'Razão Social'.
+    Também detecta variantes em minúscula (após title case): 'Observaã§ãµes' → 'Observações'.
+    Suporta mojibake de Windows-1252 (bytes 0x80-0x9F mapeados para Unicode).
+    Aplica tanto nos nomes das colunas quanto nos valores de texto.
+    """
+    import re
+
+    # Padrões de mojibake - ordenados do mais longo para o mais curto
+    _MOJIBAKE_REPLACEMENTS = {
+        # === Windows-1252 mojibake (Ã + caractere especial Unicode) ===
+        # Maiúsculas acentuadas (Ã + char Windows-1252)
+        'Ã\u2021': 'Ç', 'Ã\u2030': 'É', 'Ã\u0160': 'Ê',
+        'Ã\u201C': 'Ó', 'Ã\u201D': 'Ô', 'Ã\u2022': 'Õ',
+        'Ã\u0161': 'Ú', 'Ã\u0153': 'Ü', 'Ã\u20AC': 'À',
+        'Ã\u201A': 'Â', 'Ã\u0192': 'Ã',
+        # Minúsculas (após title case, Ã → ã)
+        'ã\u2021': 'ç', 'ã\u2030': 'é', 'ã\u0160': 'ê',
+        'ã\u201C': 'ó', 'ã\u201D': 'ô', 'ã\u2022': 'õ',
+        'ã\u0161': 'ú', 'ã\u0153': 'ü', 'ã\u20AC': 'à',
+        'ã\u201A': 'â', 'ã\u0192': 'ã',
+        # === Latin-1 mojibake padrão (Ã + byte 0xA0-0xBF) ===
+        # Padrões com Ã maiúsculo (caso original do mojibake)
+        'Ã£': 'ã', 'Ã¡': 'á', 'Ã\xa0': 'à', 'Ã¢': 'â',
+        'Ã©': 'é', 'Ãª': 'ê', 'Ã\xad': 'í',
+        'Ã³': 'ó', 'Ã´': 'ô', 'Ãµ': 'õ',
+        'Ãº': 'ú', 'Ã¼': 'ü', 'Ã§': 'ç',
+        # Padrões com ã minúsculo (após title case ter transformado Ã → ã)
+        'ã£': 'ã', 'ã¡': 'á', 'ã\xa0': 'à', 'ã¢': 'â',
+        'ã©': 'é', 'ãª': 'ê', 'ã\xad': 'í',
+        'ã³': 'ó', 'ã´': 'ô', 'ãµ': 'õ',
+        'ãº': 'ú', 'ã¼': 'ü', 'ã§': 'ç',
+        # Â + caractere especial
+        'Â°': '°', 'Âº': 'º', 'Âª': 'ª',
+        # Â sozinho antes de espaço ou no meio (artefato comum)
+    }
+    _MOJIBAKE_MARKERS = [
+        'Ã', 'Â',
+        'ã§', 'ã£', 'ã¡', 'ã©', 'ãª', 'ã\xad', 'ã³', 'ã´', 'ãµ', 'ãº', 'ã¼',
+        'ã\u2021', 'ã\u2030', 'ã\u2022', 'ã\u201C', 'ã\u201D',
+    ]
+
+    def _fix_text(val):
+        if not isinstance(val, str):
+            return val
+        # Verificar se contém padrões de mojibake
+        if not any(marker in val for marker in _MOJIBAKE_MARKERS):
+            return val
+        # Primeiro tentar encode/decode direto (funciona quando texto não foi alterado)
+        try:
+            fixed = val.encode('latin-1').decode('utf-8')
+            return fixed
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
+        # Tentar com Windows-1252
+        try:
+            fixed = val.encode('cp1252').decode('utf-8')
+            return fixed
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
+        # Se falhou, usar substituição direta de padrões
+        resultado = val
+        for pattern, replacement in sorted(_MOJIBAKE_REPLACEMENTS.items(), key=lambda x: -len(x[0])):
+            resultado = resultado.replace(pattern, replacement)
+        # Corrigir maiúsculas espúrias após acentos (causadas pelo title case)
+        resultado = re.sub(r'([ãáàâéêíóôõúüç])([A-Z])',
+                           lambda m: m.group(1) + m.group(2).lower(), resultado)
+        return resultado
+    
+    # Corrigir nomes das colunas
+    df.columns = [_fix_text(str(c)) for c in df.columns]
+    
+    # Corrigir valores de texto em todas as colunas object/string
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            df[col] = df[col].apply(lambda x: _fix_text(x) if isinstance(x, str) else x)
+    
+    return df
+
 # ============================================================
 # TIPOS DE RECEITA/DESPESA (chave DOit ← descrição amigável)
 # ============================================================
@@ -160,11 +246,13 @@ MAPEAMENTOS = {
             'BAIRRO 1': ['Bairro', 'bairro'],
             'CIDADE 1': ['Município', 'Cidade', 'cidade'],
             'ESTADO 1': ['UF', 'Estado', 'uf'],
-            'CEP 1': ['CEP', 'cep'],
+            'CEP 1': ['CEP', 'cep', 'Código Postal', 'Codigo Postal', 'CEP 1'],
             'DOCUMENTO FEDERAL': ['CNPJ/CPF', 'CNPJ', 'CPF', 'CPF/CNPJ', 'cnpj', 'cpf'],
-            'DOCUMENTO ESTADUAL': ['Inscrição estadual', 'IE', 'Inscrição Estadual', 'inscricaoEstadual'],
+            'DOCUMENTO ESTADUAL': ['Inscrição estadual', 'IE', 'Inscrição Estadual', 'inscricaoEstadual', 'RG', 'IE/RG'],
             'CLASSIFICAÇÃO': ['Descrição tipo cliente', 'Tipo pessoa', 'Classificação'],
             'TIPO': ['Tipo pessoa', 'Tipo', 'tipo'],
+            'DATA 1': ['Data de nascimento', 'Data Nascimento', 'dataNascimento'],
+            'ORIGEM': ['Situação', 'Situacao', 'situacao'],
         },
         'projetos': {
             'NOME': ['Descrição', 'Nome da Obra', 'Obra', 'descricao'],
@@ -290,8 +378,18 @@ MAPEAMENTOS = {
         'contatos': {
             'NOME': ['Nome', 'NOME', 'name', 'Cliente', 'CLIENTE', 'Razão Social'],
             'EMAIL': ['Email', 'E-mail', 'email', 'EMAIL'],
-            'TELEFONE COMERCIAL': ['Telefone', 'Tel', 'Fone', 'TELEFONE'],
+            'TELEFONE COMERCIAL': ['Telefone', 'Tel', 'Fone', 'TELEFONE', 'Telefone principal'],
             'CELULAR': ['Celular', 'Cel', 'WhatsApp', 'Whats'],
+            'DOCUMENTO FEDERAL': ['CPF', 'CNPJ', 'CPF/CNPJ', 'CNPJ/CPF', 'Documento', 'Doc'],
+            'DOCUMENTO ESTADUAL': ['RG', 'IE', 'Inscrição Estadual', 'Inscrição estadual', 'IE/RG'],
+            'RUA 1': ['Endereço', 'Rua', 'Logradouro', 'ENDEREÇO', 'RUA'],
+            'NÚMERO 1': ['Número', 'Nro', 'Num', 'Nº', 'NÚMERO', 'Número do endereço'],
+            'COMPLEMENTO 1': ['Complemento', 'Compl', 'COMPLEMENTO'],
+            'BAIRRO 1': ['Bairro', 'BAIRRO'],
+            'CIDADE 1': ['Cidade', 'Município', 'CIDADE', 'MUNICÍPIO', 'Municipio'],
+            'ESTADO 1': ['Estado', 'UF', 'ESTADO', 'Sigla UF'],
+            'CEP 1': ['CEP', 'Cep', 'cep', 'Código Postal', 'Codigo Postal', 'CEP 1'],
+            'PAÍS 1': ['País', 'Pais', 'PAÍS', 'Country'],
         },
         'projetos': {
             'NOME': ['Nome', 'NOME', 'Projeto', 'PROJETO', 'name', 'Card Name', 'Cliente'],
@@ -325,19 +423,20 @@ MAPEAMENTOS = {
             'APELIDO': ['Razão Social'],
             'EMAIL': ['Email principal', 'E-mail Contato'],
             'TELEFONE COMERCIAL': ['Telefone principal'],
-            'CELULAR': ['Telefone principal'],
-            'RUA 1': ['Endereço'],
-            'NÚMERO 1': ['Número'],
+            'CELULAR': ['Celular'],
+            'RUA 1': ['Endereço', 'Rua', 'Logradouro'],
+            'NÚMERO 1': ['Número', 'Nro'],
             'COMPLEMENTO 1': ['Complemento'],
             'BAIRRO 1': ['Bairro'],
-            'CIDADE 1': ['Cidade'],
-            'ESTADO 1': ['Estado'],
-            'CEP 1': ['CEP'],
-            'DOCUMENTO FEDERAL': ['CNPJ', 'CPF'],
-            'DOCUMENTO ESTADUAL': ['Inscrição Estadual'],
+            'CIDADE 1': ['Cidade', 'Município'],
+            'ESTADO 1': ['Estado', 'UF'],
+            'CEP 1': ['CEP', 'Cep', 'cep', 'Código Postal'],
+            'DOCUMENTO FEDERAL': ['CNPJ/CPF', 'CNPJ', 'CPF', 'CPF/CNPJ'],
+            'DOCUMENTO ESTADUAL': ['Inscrição Estadual', 'IE', 'RG'],
             'CLASSIFICAÇÃO': ['Status'],
             'ANOTAÇÕES': ['Observações'],
             'WEBSITE': ['Website'],
+            'DATA 1': ['Data fundação/Aniversário', 'DataCriacao'],
         },
         'projetos': {},
         'financeiro': {
@@ -360,19 +459,59 @@ MAPEAMENTOS = {
         'produtos': {},
         'vendas': {},
     },
+    'omie': {
+        'contatos': {
+            'NOME': ['Nome Fantasia', 'Nome', 'Razão Social'],
+            'APELIDO': ['Razão Social', 'Nome Fantasia'],
+            'EMAIL': ['Email', 'E-mail'],
+            'TELEFONE COMERCIAL': ['Telefone', 'Fone', 'Telefone principal'],
+            'CELULAR': ['Celular'],
+            'RUA 1': ['Endereço', 'Logradouro', 'Rua'],
+            'NÚMERO 1': ['Número', 'Nro'],
+            'COMPLEMENTO 1': ['Complemento'],
+            'BAIRRO 1': ['Bairro'],
+            'CIDADE 1': ['Cidade', 'Município'],
+            'ESTADO 1': ['Estado', 'UF'],
+            'CEP 1': ['CEP', 'Cep', 'cep'],
+            'DOCUMENTO FEDERAL': ['CNPJ/CPF', 'CNPJ', 'CPF', 'CPF/CNPJ'],
+            'DOCUMENTO ESTADUAL': ['Inscrição Estadual', 'IE', 'RG'],
+            'ANOTAÇÕES': ['Observações', 'Obs'],
+            'WEBSITE': ['Website', 'Site'],
+            'CLASSIFICAÇÃO': ['Tags', 'Classificação'],
+        },
+        'projetos': {},
+        'financeiro': {
+            'DATA': ['Data', 'Data Movimento', 'Data movimento'],
+            'EMISSÃO': ['Incluído em', 'Data Emissão', 'Data de competência'],
+            'VENCIMENTO': ['Data Vencimento', 'Vencimento'],
+            'DESCRIÇÃO': ['Cliente ou Fornecedor (Nome Fantasia)', 'Descrição', 'Histórico'],
+            'VALOR': ['Valor (R$)', 'Valor', 'Valor Total'],
+            'DI': ['Documento', 'Nosso Número', 'Nº Doc.'],
+            'TIPO': ['Tipo de Documento', 'Tipo', 'Natureza'],
+            'CONCILIADO': ['Situação'],
+            'ID DE / PARA': ['Cliente ou Fornecedor (Razão Social)', 'Cliente ou Fornecedor (Nome Fantasia)'],
+            '1ª CATEGORIA': ['Categoria', 'Classificação'],
+            'DEPARTAMENTO': ['Projeto', 'Centro de Custo'],
+            'ANOTAÇÕES': ['Observações'],
+        },
+        'horas': {},
+        'usuarios': {},
+        'produtos': {},
+        'vendas': {},
+    },
     'navis': {
         'contatos': {
             'NOME': ['Nome'],
             'APELIDO': ['Nome Fantasia'],
-            'EMAIL': ['Email'],
-            'TELEFONE COMERCIAL': ['Telefone'],
-            'RUA 1': ['Endereço'],
+            'EMAIL': ['Email', 'E-mail'],
+            'TELEFONE COMERCIAL': ['Telefone', 'Fone'],
+            'RUA 1': ['Endereço', 'Rua', 'Logradouro'],
             'BAIRRO 1': ['Bairro'],
-            'CIDADE 1': ['Cidade'],
-            'ESTADO 1': ['Estado'],
-            'CEP 1': ['CEP'],
-            'DOCUMENTO FEDERAL': ['CNPJ/CPF'],
-            'DOCUMENTO ESTADUAL': ['IE/RG'],
+            'CIDADE 1': ['Cidade', 'Município'],
+            'ESTADO 1': ['Estado', 'UF'],
+            'CEP 1': ['CEP', 'Cep', 'cep', 'Código Postal'],
+            'DOCUMENTO FEDERAL': ['CNPJ/CPF', 'CPF', 'CNPJ', 'CPF/CNPJ'],
+            'DOCUMENTO ESTADUAL': ['IE/RG', 'RG', 'IE', 'Inscrição Estadual'],
             'ANOTAÇÕES': ['Atividade', 'Contatos', 'Contato'],
             'COMPLEMENTO 1': ['Complemento'],
             'WEBSITE': ['Site'],
@@ -512,7 +651,7 @@ def _encontrar_coluna(df_colunas: list, opcoes: list) -> str:
     return None
 
 
-def _mapear_automatico(df_origem: pd.DataFrame, colunas_padrao: list) -> dict:
+def _mapear_automatico(df_origem: pd.DataFrame, colunas_padrao: list, colunas_ja_usadas: set = None) -> dict:
     """
     Tenta mapear automaticamente colunas por similaridade de nome.
     Usado quando a origem é 'excel_manual' ou quando não há mapeamento definido.
@@ -521,7 +660,36 @@ def _mapear_automatico(df_origem: pd.DataFrame, colunas_padrao: list) -> dict:
     mapeamento = {}
     colunas_origem = list(df_origem.columns)
     colunas_origem_lower = {c.lower().strip(): c for c in colunas_origem}
-    usadas = set()
+    usadas = set(colunas_ja_usadas) if colunas_ja_usadas else set()
+
+    # Sinônimos para campos de endereço e documentos
+    # Mapeia coluna_padrao → lista de variações comuns na origem
+    _SINONIMOS_ENDERECO = {
+        'CEP 1': ['cep', 'cep 1', 'codigo postal', 'código postal', 'zip', 'zipcode', 'zip code', 'cod postal'],
+        'CEP 2': ['cep 2', 'cep secundário', 'cep secundario'],
+        'RUA 1': ['rua', 'rua 1', 'endereço', 'endereco', 'logradouro', 'address', 'street', 'rua/av'],
+        'RUA 2': ['rua 2', 'endereço 2', 'endereco 2', 'logradouro 2'],
+        'NÚMERO 1': ['número', 'numero', 'nro', 'num', 'nº', 'número do endereço', 'numero do endereco', 'number'],
+        'NÚMERO 2': ['número 2', 'numero 2', 'nro 2'],
+        'COMPLEMENTO 1': ['complemento', 'complemento 1', 'compl', 'apto', 'apartamento', 'sala', 'bloco'],
+        'COMPLEMENTO 2': ['complemento 2', 'compl 2'],
+        'BAIRRO 1': ['bairro', 'bairro 1', 'neighborhood', 'distrito'],
+        'BAIRRO 2': ['bairro 2'],
+        'CIDADE 1': ['cidade', 'cidade 1', 'município', 'municipio', 'city', 'localidade'],
+        'CIDADE 2': ['cidade 2', 'município 2', 'municipio 2'],
+        'ESTADO 1': ['estado', 'estado 1', 'uf', 'state', 'sigla estado', 'sigla uf'],
+        'ESTADO 2': ['estado 2', 'uf 2'],
+        'PAÍS 1': ['país', 'pais', 'país 1', 'pais 1', 'country'],
+        'PAÍS 2': ['país 2', 'pais 2'],
+        'TIPO DE ENDEREÇO 1': ['tipo de endereço', 'tipo endereço', 'tipo endereco', 'tipo de endereço 1'],
+        'TIPO DE ENDEREÇO 2': ['tipo de endereço 2', 'tipo endereco 2'],
+        'DOCUMENTO FEDERAL': ['cpf', 'cnpj', 'cpf/cnpj', 'cnpj/cpf', 'documento', 'documento federal', 'doc federal', 'cpf ou cnpj'],
+        'DOCUMENTO ESTADUAL': ['rg', 'ie', 'inscrição estadual', 'inscricao estadual', 'documento estadual', 'doc estadual', 'ie/rg', 'rg/ie'],
+        'TELEFONE COMERCIAL': ['telefone', 'tel', 'fone', 'telefone comercial', 'tel comercial', 'phone', 'fone comercial', 'telefone principal'],
+        'CELULAR': ['celular', 'cel', 'whatsapp', 'whats', 'mobile', 'telefone celular'],
+        'TELEFONE RESIDENCIAL': ['telefone residencial', 'tel residencial', 'fone residencial'],
+        'EMAIL': ['email', 'e-mail', 'e mail', 'correio eletrônico', 'correio eletronico', 'mail'],
+    }
     
     # Primeira passada: match exato (case insensitive)
     for col_padrao in colunas_padrao:
@@ -532,15 +700,31 @@ def _mapear_automatico(df_origem: pd.DataFrame, colunas_padrao: list) -> dict:
                 mapeamento[col_padrao] = col_real
                 usadas.add(col_real)
     
-    # Segunda passada: match parcial (apenas para colunas ainda não mapeadas)
+    # Segunda passada: match por sinônimos (endereço, documentos, telefone, etc.)
+    for col_padrao in colunas_padrao:
+        if col_padrao in mapeamento:
+            continue
+        sinonimos = _SINONIMOS_ENDERECO.get(col_padrao, [])
+        for sinonimo in sinonimos:
+            if sinonimo in colunas_origem_lower:
+                col_real = colunas_origem_lower[sinonimo]
+                if col_real not in usadas:
+                    mapeamento[col_padrao] = col_real
+                    usadas.add(col_real)
+                    break
+    
+    # Terceira passada: match parcial por contenção
     for col_padrao in colunas_padrao:
         if col_padrao in mapeamento:
             continue
         col_lower = col_padrao.lower().strip()
+        # Remover sufixo numérico para match parcial (ex: "CEP 1" → "cep")
+        col_base = col_lower.rstrip(' 0123456789')
         for orig_lower, orig_real in colunas_origem_lower.items():
             if orig_real in usadas:
                 continue
-            if col_lower == orig_lower:
+            # Match se a coluna de origem é igual à base (ex: "cep" == "cep")
+            if col_base and orig_lower == col_base:
                 mapeamento[col_padrao] = orig_real
                 usadas.add(orig_real)
                 break
@@ -594,15 +778,33 @@ def _formatar_cep(valor):
 
 
 def _converter_data(valor):
-    """Tenta converter valor para data no formato DD/MM/YYYY."""
+    """Converte valor para string de data no formato dd/mm/yyyy (texto puro para o DOit)."""
     if pd.isna(valor) or str(valor).strip() == '':
         return ''
+    # Se já for datetime/Timestamp
+    if isinstance(valor, (pd.Timestamp,)):
+        return valor.strftime('%d/%m/%Y')
+    try:
+        import datetime
+        if isinstance(valor, (datetime.datetime, datetime.date)):
+            return valor.strftime('%d/%m/%Y')
+    except Exception:
+        pass
+    # Tentar converter string para data
     try:
         dt = pd.to_datetime(valor, dayfirst=True, errors='coerce')
         if pd.notna(dt):
             return dt.strftime('%d/%m/%Y')
     except Exception:
         pass
+    # Tentar outros formatos comuns
+    for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%Y/%m/%d']:
+        try:
+            dt = pd.to_datetime(valor, format=fmt, errors='coerce')
+            if pd.notna(dt):
+                return dt.strftime('%d/%m/%Y')
+        except Exception:
+            continue
     return str(valor)
 
 
@@ -1186,12 +1388,18 @@ def converter_arquivo(
     """
     # Carregar arquivo de entrada
     if arquivo.endswith('.csv'):
-        df_entrada = pd.read_csv(arquivo)
+        try:
+            df_entrada = pd.read_csv(arquivo, encoding='utf-8')
+        except UnicodeDecodeError:
+            df_entrada = pd.read_csv(arquivo, encoding='latin-1')
     else:
         df_entrada = pd.read_excel(arquivo)
     
     if df_entrada.empty:
         raise ValueError("Arquivo de entrada está vazio.")
+    
+    # === CORRIGIR ENCODING (MOJIBAKE) ===
+    df_entrada = _corrigir_encoding_df(df_entrada)
     
     # === LIMPAR LINHAS DE DESCRIÇÃO/EXEMPLO (DOit Coleta) ===
     if origem == 'doit_coleta':
@@ -1225,7 +1433,7 @@ def converter_arquivo(
                 mapeamento[col_padrao] = col_encontrada
         
         # Complementar com mapeamento automático para colunas não mapeadas
-        auto = _mapear_automatico(df_entrada, [c for c in colunas_padrao if c not in mapeamento])
+        auto = _mapear_automatico(df_entrada, [c for c in colunas_padrao if c not in mapeamento], set(mapeamento.values()))
         mapeamento.update(auto)
     else:
         mapeamento = _mapear_automatico(df_entrada, colunas_padrao)
@@ -1238,6 +1446,37 @@ def converter_arquivo(
             df_saida[col_padrao] = df_entrada[mapeamento[col_padrao]].values
         else:
             df_saida[col_padrao] = ''
+    
+    # === REMOVER LINHAS VAZIAS (antes de atribuir IDs) ===
+    # Uma linha é lixo se não tem nenhum campo de identificação preenchido
+    # (campos como CLASSIFICAÇÃO, TIPO, ORIGEM sozinhos não justificam uma linha)
+    CAMPOS_IDENTIFICACAO = [
+        'NOME', 'APELIDO', 'EMAIL', 'TELEFONE COMERCIAL', 'TELEFONE RESIDENCIAL',
+        'CELULAR', 'DOCUMENTO FEDERAL', 'DOCUMENTO ESTADUAL', 'WEBSITE', 'ANOTAÇÕES',
+        'RUA 1', 'CIDADE 1', 'CEP 1', 'DESCRIÇÃO', 'VALOR', 'DATA',
+        'DATA INICIAL', 'HORÁRIO INICIAL', 'HORAS TRABALHADAS',
+        'INÍCIO', 'TÉRMINO', 'DATA CONTRATO', 'CLIENTE',
+    ]
+    cols_id_presentes = [c for c in CAMPOS_IDENTIFICACAO if c in df_saida.columns]
+    
+    if cols_id_presentes:
+        mask_sem_identificacao = df_saida[cols_id_presentes].apply(
+            lambda row: all(pd.isna(v) or str(v).strip() == "" for v in row), axis=1
+        )
+        df_saida = df_saida[~mask_sem_identificacao].reset_index(drop=True)
+    else:
+        colunas_mapeadas_entrada = [col for col in mapeamento.values() if col in df_entrada.columns]
+        if colunas_mapeadas_entrada:
+            mask_entrada_vazia = df_entrada[colunas_mapeadas_entrada].apply(
+                lambda row: all(pd.isna(v) or str(v).strip() == "" for v in row), axis=1
+            )
+            df_saida = df_saida[~mask_entrada_vazia.values].reset_index(drop=True)
+        else:
+            cols_importantes = [c for c in df_saida.columns if c != "ID"]
+            mask_vazia = df_saida[cols_importantes].apply(
+                lambda row: all(pd.isna(v) or str(v).strip() == "" for v in row), axis=1
+            )
+            df_saida = df_saida[~mask_vazia].reset_index(drop=True)
     
     # === ID SEQUENCIAL ===
     if 'ID' in df_saida.columns:
@@ -1330,6 +1569,9 @@ def converter_arquivo(
     
     # === APLICAR ESTILO DE CAIXA (sobrescreve a formatação de texto) ===
     df_saida = _aplicar_caixa(df_saida, estilo_caixa)
+    
+    # === CORREÇÃO FINAL DE ENCODING (pega mojibake que sobreviveu às formatações) ===
+    df_saida = _corrigir_encoding_df(df_saida)
     
     # === VALIDAR PADRONIZAÇÕES ===
     padronizacoes = _carregar_padronizacoes()

@@ -15,6 +15,84 @@ def _get_engine(filename):
         return "xlrd"
     return "openpyxl"
 
+
+def _corrigir_encoding(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Corrige problemas de encoding (mojibake) em DataFrames.
+    Detecta e corrige textos como 'RazÃ£o Social' → 'Razão Social'.
+    Também detecta variantes em minúscula (após title case): 'Observaã§ãµes' → 'Observações'.
+    Suporta mojibake de Windows-1252 (bytes 0x80-0x9F mapeados para Unicode).
+    Aplica tanto nos nomes das colunas quanto nos valores de texto.
+    """
+    import re
+
+    # Padrões de mojibake - ordenados do mais longo para o mais curto
+    _MOJIBAKE_REPLACEMENTS = {
+        # === Windows-1252 mojibake (Ã + caractere especial Unicode) ===
+        'Ã\u2021': 'Ç', 'Ã\u2030': 'É', 'Ã\u0160': 'Ê',
+        'Ã\u201C': 'Ó', 'Ã\u201D': 'Ô', 'Ã\u2022': 'Õ',
+        'Ã\u0161': 'Ú', 'Ã\u0153': 'Ü', 'Ã\u20AC': 'À',
+        'Ã\u201A': 'Â', 'Ã\u0192': 'Ã',
+        # Minúsculas (após title case, Ã → ã)
+        'ã\u2021': 'ç', 'ã\u2030': 'é', 'ã\u0160': 'ê',
+        'ã\u201C': 'ó', 'ã\u201D': 'ô', 'ã\u2022': 'õ',
+        'ã\u0161': 'ú', 'ã\u0153': 'ü', 'ã\u20AC': 'à',
+        'ã\u201A': 'â', 'ã\u0192': 'ã',
+        # === Latin-1 mojibake padrão (Ã + byte 0xA0-0xBF) ===
+        'Ã£': 'ã', 'Ã¡': 'á', 'Ã\xa0': 'à', 'Ã¢': 'â',
+        'Ã©': 'é', 'Ãª': 'ê', 'Ã\xad': 'í',
+        'Ã³': 'ó', 'Ã´': 'ô', 'Ãµ': 'õ',
+        'Ãº': 'ú', 'Ã¼': 'ü', 'Ã§': 'ç',
+        # Padrões com ã minúsculo (após title case)
+        'ã£': 'ã', 'ã¡': 'á', 'ã\xa0': 'à', 'ã¢': 'â',
+        'ã©': 'é', 'ãª': 'ê', 'ã\xad': 'í',
+        'ã³': 'ó', 'ã´': 'ô', 'ãµ': 'õ',
+        'ãº': 'ú', 'ã¼': 'ü', 'ã§': 'ç',
+        # Â + caractere especial
+        'Â°': '°', 'Âº': 'º', 'Âª': 'ª',
+    }
+    _MOJIBAKE_MARKERS = [
+        'Ã', 'Â',
+        'ã§', 'ã£', 'ã¡', 'ã©', 'ãª', 'ã\xad', 'ã³', 'ã´', 'ãµ', 'ãº', 'ã¼',
+        'ã\u2021', 'ã\u2030', 'ã\u2022', 'ã\u201C', 'ã\u201D',
+    ]
+
+    def _fix_text(val):
+        if not isinstance(val, str):
+            return val
+        if not any(marker in val for marker in _MOJIBAKE_MARKERS):
+            return val
+        # Primeiro tentar encode/decode direto
+        try:
+            fixed = val.encode('latin-1').decode('utf-8')
+            return fixed
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
+        # Tentar com Windows-1252
+        try:
+            fixed = val.encode('cp1252').decode('utf-8')
+            return fixed
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
+        # Substituição direta de padrões
+        resultado = val
+        for pattern, replacement in sorted(_MOJIBAKE_REPLACEMENTS.items(), key=lambda x: -len(x[0])):
+            resultado = resultado.replace(pattern, replacement)
+        # Corrigir maiúsculas espúrias após acentos
+        resultado = re.sub(r'([ãáàâéêíóôõúüç])([A-Z])',
+                           lambda m: m.group(1) + m.group(2).lower(), resultado)
+        return resultado
+    
+    # Corrigir nomes das colunas
+    df.columns = [_fix_text(str(c)) for c in df.columns]
+    
+    # Corrigir valores de texto em todas as colunas object/string
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            df[col] = df[col].apply(lambda x: _fix_text(x) if isinstance(x, str) else x)
+    
+    return df
+
 # Adicionar pasta scripts ao path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
 
@@ -110,6 +188,7 @@ origem_opcoes = {
     'DOit Coleta (Planilha Padrão)': 'doit_coleta',
     'Conta Azul': 'conta_azul',
     'Navis': 'navis',
+    'Omie': 'omie',
     'ClickUp': 'clickup',
     'Sienge': 'sienge',
     'Trello': 'trello',
@@ -209,7 +288,12 @@ if uploaded_file is not None:
     # Ler arquivo
     try:
         if uploaded_file.name.lower().endswith('.csv'):
-            df_entrada = pd.read_csv(uploaded_file)
+            # Tentar ler com UTF-8 primeiro, depois Latin-1 se falhar
+            try:
+                df_entrada = pd.read_csv(uploaded_file, encoding='utf-8')
+            except UnicodeDecodeError:
+                uploaded_file.seek(0)
+                df_entrada = pd.read_csv(uploaded_file, encoding='latin-1')
             # Pós-processamento Outlook (CSV)
             if origem == "outlook":
                 partes_nome = []
@@ -411,16 +495,26 @@ if uploaded_file is not None:
                 
                 # Selecionar aba automaticamente com base no tipo
                 if tipo == 'financeiro':
-                    aba_alvo = next((a for a in abas if 'extrato' in a.lower() or 'financeiro' in a.lower()), None)
+                    aba_alvo = next((a for a in abas if 'extrato' in a.lower() or 'financeiro' in a.lower() 
+                                     or 'contas' in a.lower() or 'pagar' in a.lower() or 'receber' in a.lower()), None)
                 elif tipo == 'contatos':
-                    aba_alvo = next((a for a in abas if 'cadastro' in a.lower() or 'cliente' in a.lower()), None)
+                    aba_alvo = next((a for a in abas if 'cadastro' in a.lower() or 'cliente' in a.lower() or 'fornecedor' in a.lower()), None)
+                elif tipo == 'vendas':
+                    aba_alvo = next((a for a in abas if 'venda' in a.lower()), None)
                 else:
                     aba_alvo = None
                 
                 if aba_alvo is None:
                     aba_alvo = st.selectbox("📄 Selecione a aba com os dados", abas, key='aba_conta_azul')
                 else:
-                    st.info(f"📄 Aba detectada automaticamente: **{aba_alvo}**")
+                    # Se há múltiplas abas possíveis, permitir escolha
+                    abas_possiveis = [a for a in abas if any(kw in a.lower() for kw in ['contas', 'pagar', 'receber', 'venda', 'cliente', 'fornecedor', 'cadastro', 'extrato', 'financeiro'])]
+                    if len(abas_possiveis) > 1 and tipo == 'financeiro':
+                        aba_alvo = st.selectbox("📄 Selecione a aba com os dados", abas_possiveis, 
+                                               index=abas_possiveis.index(aba_alvo) if aba_alvo in abas_possiveis else 0,
+                                               key='aba_conta_azul')
+                    else:
+                        st.info(f"📄 Aba detectada automaticamente: **{aba_alvo}**")
                 
                 # Ler sem header para detectar cabeçalho real
                 df_raw = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_alvo, header=None)
@@ -451,6 +545,21 @@ if uploaded_file is not None:
                 
                 # Remover linhas completamente vazias
                 df_entrada = df_entrada.dropna(how='all').reset_index(drop=True)
+                
+                # Conta Azul: juntar CNPJ e CPF em uma única coluna (CNPJ/CPF)
+                if tipo == 'contatos':
+                    col_cnpj = next((c for c in df_entrada.columns if c.upper() == 'CNPJ'), None)
+                    col_cpf = next((c for c in df_entrada.columns if c.upper() == 'CPF'), None)
+                    if col_cnpj and col_cpf:
+                        df_entrada['CNPJ/CPF'] = df_entrada.apply(
+                            lambda row: str(row[col_cnpj]).strip() if pd.notna(row[col_cnpj]) and str(row[col_cnpj]).strip()
+                            else (str(row[col_cpf]).strip() if pd.notna(row[col_cpf]) and str(row[col_cpf]).strip() else ''),
+                            axis=1
+                        )
+                    elif col_cnpj:
+                        df_entrada['CNPJ/CPF'] = df_entrada[col_cnpj]
+                    elif col_cpf:
+                        df_entrada['CNPJ/CPF'] = df_entrada[col_cpf]
                 
                 # Tratar coluna TIPO: Conta Azul usa "Crédito"/"Débito" → converter para "Receita"/"Despesa"
                 if tipo == 'financeiro':
@@ -617,20 +726,25 @@ if uploaded_file is not None:
                 # Remover linhas completamente vazias
                 df_entrada = df_entrada.dropna(how='all').reset_index(drop=True)
             
-            # Sienge e ClickUp: detectar cabeçalho automaticamente (pular metadados no topo)
-            elif origem in ('sienge', 'clickup'):
+            # Sienge, ClickUp e Omie: detectar cabeçalho automaticamente (pular metadados no topo)
+            elif origem in ('sienge', 'clickup', 'omie'):
                 uploaded_file.seek(0)
                 df_raw = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), header=None)
                 
                 # Procurar linha com mais colunas preenchidas e palavras-chave
-                palavras_chave_fin = ['data', 'valor', 'histórico', 'documento', 'débito', 'crédito',
-                                      'conta', 'emissão', 'vencto', 'baixa', 'favorecido', 'classificação']
+                palavras_chave_detect = ['data', 'valor', 'histórico', 'documento', 'débito', 'crédito',
+                                      'conta', 'emissão', 'vencto', 'baixa', 'favorecido', 'classificação',
+                                      'nome', 'cpf', 'cnpj', 'endereço', 'telefone', 'email', 'e-mail',
+                                      'bairro', 'cidade', 'município', 'cep', 'uf', 'estado',
+                                      'código', 'tipo', 'situação', 'projeto', 'obra', 'status',
+                                      'categoria', 'parcela', 'cliente', 'fornecedor', 'origem',
+                                      'pedido', 'vendedor', 'observações', 'saldo']
                 
                 melhor_linha = 0
                 melhor_score = 0
                 for i in range(min(15, len(df_raw))):
                     row_vals = [str(v).lower().strip() for v in df_raw.iloc[i] if pd.notna(v) and str(v).strip()]
-                    score = sum(1 for val in row_vals for kw in palavras_chave_fin if kw in val)
+                    score = sum(1 for val in row_vals for kw in palavras_chave_detect if kw in val)
                     score += len(row_vals) * 0.2
                     if score > melhor_score:
                         melhor_score = score
@@ -645,12 +759,45 @@ if uploaded_file is not None:
                     st.caption(f"Cabeçalho detectado na linha {melhor_linha + 1}")
                 else:
                     df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name))
+                
+                # Omie: remover linhas de SALDO e SALDO ANTERIOR (não são lançamentos)
+                if origem == 'omie' and tipo == 'financeiro':
+                    # Detectar coluna de descrição/nome fantasia
+                    col_desc = next((c for c in df_entrada.columns if 'nome fantasia' in str(c).lower() or 'descrição' in str(c).lower()), None)
+                    if col_desc is None:
+                        # Tentar pela terceira coluna (padrão Omie)
+                        col_desc = df_entrada.columns[2] if len(df_entrada.columns) > 2 else None
+                    if col_desc:
+                        mask_saldo = df_entrada[col_desc].astype(str).str.strip().str.upper().isin(['SALDO', 'SALDO ANTERIOR'])
+                        removidos = mask_saldo.sum()
+                        df_entrada = df_entrada[~mask_saldo].reset_index(drop=True)
+                        if removidos > 0:
+                            st.caption(f"Removidas {removidos} linhas de saldo")
+                    
+                    # Tratar CONCILIADO: "Conciliado" → "Sim", vazio → "Não"
+                    col_situacao = next((c for c in df_entrada.columns if 'situa' in str(c).lower()), None)
+                    if col_situacao:
+                        df_entrada[col_situacao] = df_entrada[col_situacao].apply(
+                            lambda x: 'Sim' if pd.notna(x) and 'concilia' in str(x).lower() else 'Não'
+                        )
             
             else:
-                df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name))
+                # Excel Manual / Trello / outros: permitir escolha de aba
+                uploaded_file.seek(0)
+                xls = pd.ExcelFile(uploaded_file, engine=_get_engine(uploaded_file.name))
+                abas = xls.sheet_names
+                if len(abas) > 1:
+                    aba_escolhida = st.selectbox("📄 Selecione a aba com os dados", abas, key='aba_excel_manual')
+                else:
+                    aba_escolhida = abas[0]
+                uploaded_file.seek(0)
+                df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_escolhida)
     except Exception as e:
         st.error(f"❌ Erro ao ler o arquivo: {e}")
         st.stop()
+    
+    # Corrigir encoding (mojibake) em colunas e valores
+    df_entrada = _corrigir_encoding(df_entrada)
     
     st.success(f"✅ Arquivo carregado: **{uploaded_file.name}** ({len(df_entrada)} registros, {len(df_entrada.columns)} colunas)")
     
@@ -684,7 +831,7 @@ if uploaded_file is not None:
             if col_encontrada:
                 mapeamento_sugerido[col_padrao] = col_encontrada
         
-        auto = _mapear_automatico(df_entrada, [c for c in colunas_padrao if c not in mapeamento_sugerido])
+        auto = _mapear_automatico(df_entrada, [c for c in colunas_padrao if c not in mapeamento_sugerido], set(mapeamento_sugerido.values()))
         mapeamento_sugerido.update(auto)
     else:
         mapeamento_sugerido = _mapear_automatico(df_entrada, colunas_padrao)
@@ -897,6 +1044,39 @@ if uploaded_file is not None:
                 else:
                     df_saida[col_padrao] = ''
             
+            # === REMOVER LINHAS VAZIAS (ANTES de IDs e valores manuais) ===
+            # Uma linha é considerada lixo se não tem nenhum campo de identificação preenchido
+            # (campos como CLASSIFICAÇÃO, TIPO, ORIGEM sozinhos não justificam uma linha)
+            CAMPOS_IDENTIFICACAO = [
+                'NOME', 'APELIDO', 'EMAIL', 'TELEFONE COMERCIAL', 'TELEFONE RESIDENCIAL',
+                'CELULAR', 'DOCUMENTO FEDERAL', 'DOCUMENTO ESTADUAL', 'WEBSITE', 'ANOTAÇÕES',
+                'RUA 1', 'CIDADE 1', 'CEP 1', 'DESCRIÇÃO', 'VALOR', 'DATA',
+                'DATA INICIAL', 'HORÁRIO INICIAL', 'HORAS TRABALHADAS',
+                'INÍCIO', 'TÉRMINO', 'DATA CONTRATO', 'CLIENTE',
+            ]
+            # Identificar quais colunas de identificação existem no df_saida
+            cols_id_presentes = [c for c in CAMPOS_IDENTIFICACAO if c in df_saida.columns]
+            
+            if cols_id_presentes:
+                mask_sem_identificacao = df_saida[cols_id_presentes].apply(
+                    lambda row: all(pd.isna(v) or str(v).strip() == "" for v in row), axis=1
+                )
+                df_saida = df_saida[~mask_sem_identificacao].reset_index(drop=True)
+            else:
+                # Fallback: verificar na ENTRADA se todas as colunas mapeadas estão vazias
+                colunas_mapeadas_entrada = [col for col in mapeamento_final.values() if col in df_entrada.columns]
+                if colunas_mapeadas_entrada:
+                    mask_entrada_vazia = df_entrada[colunas_mapeadas_entrada].apply(
+                        lambda row: all(pd.isna(v) or str(v).strip() == "" for v in row), axis=1
+                    )
+                    df_saida = df_saida[~mask_entrada_vazia.values].reset_index(drop=True)
+                else:
+                    cols_importantes_pre = [c for c in df_saida.columns if c != "ID"]
+                    mask_vazia_pre = df_saida[cols_importantes_pre].apply(
+                        lambda row: all(pd.isna(v) or str(v).strip() == "" for v in row), axis=1
+                    )
+                    df_saida = df_saida[~mask_vazia_pre].reset_index(drop=True)
+            
             # ID sequencial
             if 'ID' in df_saida.columns:
                 df_saida['ID'] = range(id_inicial, id_inicial + len(df_saida))
@@ -1044,16 +1224,17 @@ if uploaded_file is not None:
                                 for nome in nao_encontrados_proj[:20]:
                                     st.markdown(f"  - {nome}")
             
-            # === REMOVER LINHAS VAZIAS ===
-            # Remover linhas onde todas as colunas importantes estão vazias
-            cols_importantes = [c for c in df_saida.columns if c != "ID"]
-            mask_vazia = df_saida[cols_importantes].apply(
-                lambda row: all(pd.isna(v) or str(v).strip() == "" for v in row), axis=1
-            )
-            df_saida = df_saida[~mask_vazia].reset_index(drop=True)
-            # Recalcular IDs após remoção
-            if "ID" in df_saida.columns:
-                df_saida["ID"] = range(id_inicial, id_inicial + len(df_saida))
+            # === REMOVER LINHAS VAZIAS (safety net final) ===
+            # Remover linhas onde todas as colunas exceto ID e valores manuais estão vazias
+            cols_nao_manuais = [c for c in df_saida.columns if c != "ID" and c not in valores_manuais]
+            if cols_nao_manuais:
+                mask_vazia = df_saida[cols_nao_manuais].apply(
+                    lambda row: all(pd.isna(v) or str(v).strip() == "" for v in row), axis=1
+                )
+                df_saida = df_saida[~mask_vazia].reset_index(drop=True)
+                # Recalcular IDs após remoção
+                if "ID" in df_saida.columns:
+                    df_saida["ID"] = range(id_inicial, id_inicial + len(df_saida))
             
             # === TRATAR R/D (Receita/Despesa) NO FINANCEIRO ===
             if tipo == "financeiro" and "TIPO" in df_saida.columns and "VALOR" in df_saida.columns:
@@ -1111,6 +1292,22 @@ if uploaded_file is not None:
             # Aplicar estilo de caixa
             from conversor import _aplicar_caixa, _validar_padronizacoes, _carregar_padronizacoes
             df_saida = _aplicar_caixa(df_saida, estilo_caixa)
+            
+            # === FORMATAR DATAS COMO TEXTO dd/mm/yyyy (DOit exige texto, não tipo data do Excel) ===
+            COLUNAS_DATA = [
+                'INÍCIO', 'EXECUÇÃO', 'TÉRMINO', 'DATA CONTRATO',
+                'DATA', 'EMISSÃO', 'VENCIMENTO',
+                'DATA INICIAL', 'DATA FINAL',
+                'COLUNA DE DATA CUSTOMIZÁVEL',
+                'DATA 1', 'DATA 2', 'DATA 3', 'DATA 4', 'DATA 5',
+            ]
+            from conversor import _converter_data
+            for col_data in COLUNAS_DATA:
+                if col_data in df_saida.columns:
+                    df_saida[col_data] = df_saida[col_data].apply(_converter_data)
+            
+            # Correção final de encoding (pega mojibake que sobreviveu às formatações)
+            df_saida = _corrigir_encoding(df_saida)
             
             # Validar padronizações
             padronizacoes = _carregar_padronizacoes()

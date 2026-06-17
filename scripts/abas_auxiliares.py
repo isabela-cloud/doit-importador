@@ -299,6 +299,13 @@ def _formatar_aba(ws, df):
         bottom=Side(style='thin', color='CCCCCC')
     )
     
+    # Identificar colunas de data
+    colunas_data = set()
+    for col_idx, col_name in enumerate(df.columns, 1):
+        col_upper = str(col_name).upper()
+        if any(kw in col_upper for kw in ['DATA', 'INÍCIO', 'INICIO', 'TÉRMINO', 'TERMINO', 'EXECUÇÃO', 'EXECUCAO', 'EMISSÃO', 'EMISSAO', 'VENCIMENTO']):
+            colunas_data.add(col_idx)
+    
     # Formatar cabeçalho
     for col_idx in range(1, len(df.columns) + 1):
         cell = ws.cell(row=1, column=col_idx)
@@ -306,6 +313,17 @@ def _formatar_aba(ws, df):
         cell.fill = header_fill
         cell.alignment = header_alignment
         cell.border = thin_border
+    
+    # Formatar colunas de data com formato DD/MM/YYYY
+    for col_idx in colunas_data:
+        for row_idx in range(2, len(df) + 2):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            if cell.value is not None and cell.value != '':
+                cell.number_format = 'DD/MM/YYYY'
+            else:
+                # Garantir que células vazias de data fiquem realmente vazias (sem tipo texto)
+                cell.value = None
+                cell.data_type = 'n'
     
     # Ajustar largura das colunas
     for col_idx in range(1, len(df.columns) + 1):
@@ -426,6 +444,27 @@ def gerar_excel_completo(
     import io
     
     output = io.BytesIO()
+    
+    # Converter strings vazias para None em colunas de data
+    # E garantir que valores de data são datetime (não strings)
+    # (evita que o Excel grave como texto, causando erro no DOit)
+    colunas_data_keywords = ['DATA', 'INÍCIO', 'INICIO', 'TÉRMINO', 'TERMINO', 
+                             'EXECUÇÃO', 'EXECUCAO', 'EMISSÃO', 'EMISSAO', 'VENCIMENTO',
+                             'COLUNA CUSTOMIZÁVEL DATA']
+    for col in df_saida.columns:
+        col_upper = str(col).upper()
+        if any(kw in col_upper for kw in colunas_data_keywords):
+            def _to_datetime_or_none(x):
+                if x is None or (isinstance(x, str) and x.strip() == '') or (hasattr(pd, 'isna') and pd.isna(x)):
+                    return None
+                if isinstance(x, str):
+                    try:
+                        dt = pd.to_datetime(x, dayfirst=True, errors='coerce')
+                        return dt if pd.notna(dt) else None
+                    except Exception:
+                        return None
+                return x
+            df_saida[col] = df_saida[col].apply(_to_datetime_or_none)
     
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         # Aba principal: dados para importação
