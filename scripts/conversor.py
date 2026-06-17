@@ -642,12 +642,12 @@ def _encontrar_coluna(df_colunas: list, opcoes: list) -> str:
     """Encontra a primeira coluna que existe no DataFrame."""
     if not opcoes:
         return None
-    df_colunas_lower = {c.lower().strip(): c for c in df_colunas}
+    df_colunas_lower = {str(c).lower().strip(): c for c in df_colunas}
     for opcao in opcoes:
         if opcao in df_colunas:
             return opcao
-        if opcao.lower().strip() in df_colunas_lower:
-            return df_colunas_lower[opcao.lower().strip()]
+        if str(opcao).lower().strip() in df_colunas_lower:
+            return df_colunas_lower[str(opcao).lower().strip()]
     return None
 
 
@@ -659,7 +659,7 @@ def _mapear_automatico(df_origem: pd.DataFrame, colunas_padrao: list, colunas_ja
     """
     mapeamento = {}
     colunas_origem = list(df_origem.columns)
-    colunas_origem_lower = {c.lower().strip(): c for c in colunas_origem}
+    colunas_origem_lower = {str(c).lower().strip(): c for c in colunas_origem}
     usadas = set(colunas_ja_usadas) if colunas_ja_usadas else set()
 
     # Sinônimos para campos de endereço e documentos
