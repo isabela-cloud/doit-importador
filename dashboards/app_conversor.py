@@ -823,6 +823,10 @@ if uploaded_file is not None:
     colunas_origem = ['(deixar vazio)'] + list(df_entrada.columns)
     
     # Calcular mapeamento sugerido
+    # Limpar colunas com nomes inválidos (numéricos, None, NaN) antes do mapeamento
+    colunas_validas = [c for c in df_entrada.columns if c is not None and str(c).strip() != '' and 'unnamed' not in str(c).lower()]
+    df_entrada = df_entrada[[c for c in df_entrada.columns if c in colunas_validas or (c is not None and str(c).strip() != '' and 'unnamed' not in str(c).lower())]]
+    
     if origem in MAPEAMENTOS and tipo in MAPEAMENTOS[origem]:
         mapeamento_definido = MAPEAMENTOS[origem][tipo]
         mapeamento_sugerido = {}
@@ -831,7 +835,8 @@ if uploaded_file is not None:
             if col_encontrada:
                 mapeamento_sugerido[col_padrao] = col_encontrada
         
-        auto = _mapear_automatico(df_entrada, [c for c in colunas_padrao if c not in mapeamento_sugerido], set(mapeamento_sugerido.values()))
+        ja_usadas = set(v for v in mapeamento_sugerido.values() if v is not None)
+        auto = _mapear_automatico(df_entrada, [c for c in colunas_padrao if c not in mapeamento_sugerido], ja_usadas)
         mapeamento_sugerido.update(auto)
     else:
         mapeamento_sugerido = _mapear_automatico(df_entrada, colunas_padrao)
