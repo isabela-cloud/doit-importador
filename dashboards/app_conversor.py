@@ -241,6 +241,7 @@ id_inicial = id_inicial_map[tipo]
 # Upload de referências para vínculo de IDs
 cadastro_ref_file = None
 projetos_ref_file = None
+usuarios_ref_file = None
 
 if tipo in ['projetos', 'financeiro']:
     st.sidebar.subheader("🔗 Vincular IDs")
@@ -249,6 +250,14 @@ if tipo in ['projetos', 'financeiro']:
         type=['xlsx'],
         key='cadastro_ref',
         help="Upload do cadastro já convertido para vincular ID DO CADASTRO"
+    )
+
+if tipo == 'projetos':
+    usuarios_ref_file = st.sidebar.file_uploader(
+        "Usuários convertido (para ID Líder)",
+        type=['xlsx'],
+        key='usuarios_ref',
+        help="Upload dos usuários já convertidos para vincular ID LÍDER"
     )
 
 if tipo == 'financeiro':
@@ -1180,6 +1189,74 @@ if uploaded_file is not None:
                             st.warning(
                                 f"⚠️ **{len(clientes_preenchidos)} projeto(s) têm cliente preenchido** mas nenhum cadastro de referência foi enviado. "
                                 f"Faça upload do cadastro convertido na sidebar para vincular os IDs."
+                            )
+            
+            # Vincular ID LÍDER com planilha de usuários
+            if tipo == 'projetos' and 'ID LÍDER' in df_saida.columns:
+                from conversor import _encontrar_coluna
+                col_lider_origem = _encontrar_coluna(
+                    list(df_entrada.columns),
+                    ['Responsável', 'RESPONSÁVEL', 'responsável', 'Líder', 'Projetista', 'PROJETISTA',
+                     'Gestor', 'Gestão', 'Assignee', 'Owner', 'Responsavel']
+                )
+                
+                df_usuarios_ref = None
+                if usuarios_ref_file is not None:
+                    df_usuarios_ref = pd.read_excel(usuarios_ref_file)
+                
+                if df_usuarios_ref is not None and 'NOME' in df_usuarios_ref.columns:
+                    # Criar mapa nome → ID (case insensitive, parcial)
+                    mapa_usuario_id = {}
+                    for _, row in df_usuarios_ref.iterrows():
+                        nome = str(row['NOME']).lower().strip()
+                        id_val = row.get('ID USUARIO', row.get('ID', ''))
+                        if nome and id_val != '':
+                            mapa_usuario_id[nome] = id_val
+                            # Adicionar também primeiro nome para match parcial
+                            primeiro_nome = nome.split()[0] if nome.split() else ''
+                            if primeiro_nome and primeiro_nome not in mapa_usuario_id:
+                                mapa_usuario_id[primeiro_nome] = id_val
+                    
+                    if col_lider_origem:
+                        def _buscar_id_usuario(val):
+                            if pd.isna(val) or str(val).strip() == '':
+                                return ''
+                            val_lower = str(val).lower().strip()
+                            # Match exato
+                            if val_lower in mapa_usuario_id:
+                                return mapa_usuario_id[val_lower]
+                            # Match por primeiro nome
+                            primeiro = val_lower.split()[0] if val_lower.split() else ''
+                            if primeiro in mapa_usuario_id:
+                                return mapa_usuario_id[primeiro]
+                            return ''
+                        
+                        df_saida['ID LÍDER'] = df_entrada[col_lider_origem].apply(_buscar_id_usuario)
+                        
+                        # Alertar líderes não encontrados
+                        lideres_origem = df_entrada[col_lider_origem].dropna()
+                        lideres_origem = lideres_origem[lideres_origem.astype(str).str.strip() != '']
+                        nao_encontrados = sorted(set(
+                            str(l).strip() for l in lideres_origem
+                            if _buscar_id_usuario(l) == ''
+                        ))
+                        if nao_encontrados:
+                            st.error(
+                                f"🚨 **{len(nao_encontrados)} líder(es) não encontrado(s) nos usuários de referência** "
+                                f"(o campo ID LÍDER ficará vazio para esses projetos):"
+                            )
+                            for nome_lider in nao_encontrados:
+                                st.markdown(f"  - {nome_lider}")
+                            st.info("Verifique se esses nomes estão na planilha de usuários convertida.")
+                else:
+                    # Sem referência de usuários - alertar se há líderes preenchidos
+                    if col_lider_origem:
+                        lideres_preenchidos = df_entrada[col_lider_origem].dropna()
+                        lideres_preenchidos = lideres_preenchidos[lideres_preenchidos.astype(str).str.strip() != '']
+                        if len(lideres_preenchidos) > 0:
+                            st.warning(
+                                f"⚠️ **{len(lideres_preenchidos)} projeto(s) têm responsável/líder preenchido** mas nenhuma planilha de usuários foi enviada. "
+                                f"Faça upload dos usuários convertidos na sidebar para vincular o ID LÍDER."
                             )
             
             if tipo == 'financeiro':
