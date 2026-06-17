@@ -307,15 +307,6 @@ if tipo == 'financeiro':
         help="Upload das faturas já convertidas para vincular ID FATURA"
     )
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("""
-**Como usar:**
-1. Selecione o tipo e origem
-2. Configure caixa e IDs iniciais
-3. Faça upload do arquivo
-4. Revise o mapeamento
-5. Baixe o arquivo convertido
-""")
 
 # ============================================================
 # ÁREA PRINCIPAL
