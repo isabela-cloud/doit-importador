@@ -325,9 +325,9 @@ st.markdown(f'<div class="info-box">📦 Transforme planilhas de qualquer sistem
 
 # Upload do arquivo
 st.divider()
-st.markdown('<div class="section-header">📂 Upload</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header">📂 Arquivo de Origem</div>', unsafe_allow_html=True)
 uploaded_file = st.file_uploader(
-    "📂 Faça upload do arquivo do cliente",
+    "Selecione a planilha do cliente",
     type=['xlsx', 'xls', 'csv'],
     help="Aceita arquivos Excel (.xlsx, .xls) e CSV (.csv)"
 )
