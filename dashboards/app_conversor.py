@@ -729,7 +729,15 @@ if uploaded_file is not None:
             # Sienge, ClickUp e Omie: detectar cabeçalho automaticamente (pular metadados no topo)
             elif origem in ('sienge', 'clickup', 'omie'):
                 uploaded_file.seek(0)
-                df_raw = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), header=None)
+                xls = pd.ExcelFile(uploaded_file, engine=_get_engine(uploaded_file.name))
+                abas = xls.sheet_names
+                if len(abas) > 1:
+                    aba_escolhida = st.selectbox("📄 Selecione a aba com os dados", abas, key='aba_sienge_clickup_omie')
+                else:
+                    aba_escolhida = abas[0]
+                
+                uploaded_file.seek(0)
+                df_raw = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_escolhida, header=None)
                 
                 # Procurar linha com mais colunas preenchidas e palavras-chave
                 palavras_chave_detect = ['data', 'valor', 'histórico', 'documento', 'débito', 'crédito',
@@ -751,14 +759,16 @@ if uploaded_file is not None:
                         melhor_linha = i
                 
                 if melhor_score > 1:
-                    df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), header=melhor_linha)
+                    uploaded_file.seek(0)
+                    df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_escolhida, header=melhor_linha)
                     # Limpar colunas Unnamed
                     df_entrada = df_entrada[[c for c in df_entrada.columns if 'unnamed' not in str(c).lower()]]
                     # Remover linhas vazias
                     df_entrada = df_entrada.dropna(how='all').reset_index(drop=True)
                     st.caption(f"Cabeçalho detectado na linha {melhor_linha + 1}")
                 else:
-                    df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name))
+                    uploaded_file.seek(0)
+                    df_entrada = pd.read_excel(uploaded_file, engine=_get_engine(uploaded_file.name), sheet_name=aba_escolhida)
                 
                 # Omie: remover linhas de SALDO e SALDO ANTERIOR (não são lançamentos)
                 if origem == 'omie' and tipo == 'financeiro':
