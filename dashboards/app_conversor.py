@@ -173,6 +173,7 @@ st.sidebar.title("⚙️ Configuração")
 # Seleção do tipo de dado
 tipo_opcoes = {
     'Contatos / Pessoas': 'contatos',
+    'Contatos Relacionados': 'contatos_relacionados',
     'Projetos': 'projetos',
     'Financeiro': 'financeiro',
     'Horas Trabalhadas': 'horas',
@@ -229,6 +230,7 @@ id_inicial_usuarios = st.sidebar.number_input("Usuários", min_value=1, value=9,
 # Selecionar o ID correto para o tipo atual
 id_inicial_map = {
     'contatos': id_inicial_contatos,
+    'contatos_relacionados': 1,
     'projetos': id_inicial_projetos,
     'financeiro': id_inicial_financeiro,
     'horas': id_inicial_horas,
@@ -236,7 +238,7 @@ id_inicial_map = {
     'produtos': 1,
     'vendas': 1,
 }
-id_inicial = id_inicial_map[tipo]
+id_inicial = id_inicial_map.get(tipo, 1)
 
 # Upload de referências para vínculo de IDs
 cadastro_ref_file = None
@@ -254,6 +256,15 @@ if tipo in ['projetos', 'financeiro']:
         type=['xlsx'],
         key='cadastro_ref',
         help="Upload do cadastro já convertido para vincular ID DO CADASTRO / ID DE PARA"
+    )
+
+if tipo == 'contatos_relacionados':
+    st.sidebar.subheader("🔗 Vincular IDs")
+    cadastro_ref_file = st.sidebar.file_uploader(
+        "Cadastro convertido (para ID PAI e ID FILHO)",
+        type=['xlsx'],
+        key='cadastro_ref',
+        help="Upload do cadastro já convertido para vincular automaticamente os IDs de PAI e FILHO pelo nome"
     )
 
 if tipo == 'projetos':
@@ -678,6 +689,7 @@ if uploaded_file is not None:
             elif origem == 'doit_coleta':
                 abas_por_tipo = {
                     'contatos': 'MODELO DE CONTATOS ',
+                    'contatos_relacionados': 'MODELO DE CONTATOS RELACIONADOS',
                     'projetos': 'MODELO DE PROJETOS',
                     'financeiro': 'MODELO FINANCEIRO ',
                     'horas': 'MODELO ESTRUTURA DE ATIVIDADES ',
@@ -1280,6 +1292,35 @@ if uploaded_file is not None:
                     st.markdown(f"  - **{col_nome}** ({qtd} registro{'s' if qtd > 1 else ''} preenchido{'s' if qtd > 1 else ''})")
             
             # Vincular IDs
+            # Contatos Relacionados: vincular ID PAI e ID FILHO pelo nome
+            if tipo == 'contatos_relacionados' and cadastro_ref_file is not None:
+                df_cad = pd.read_excel(cadastro_ref_file)
+                if 'NOME' in df_cad.columns and 'ID' in df_cad.columns:
+                    mapa_nome_id = dict(zip(
+                        df_cad['NOME'].astype(str).str.lower().str.strip(),
+                        df_cad['ID']
+                    ))
+                    
+                    def _buscar_id_cadastro(val):
+                        if pd.isna(val) or str(val).strip() == '':
+                            return ''
+                        v = str(val).lower().strip()
+                        return mapa_nome_id.get(v, val)  # retorna o valor original se não encontrar (já pode ser ID)
+                    
+                    # Vincular ID PAI (se veio como nome)
+                    if 'ID PAI' in df_saida.columns:
+                        df_saida['ID PAI'] = df_saida['ID PAI'].apply(
+                            lambda x: mapa_nome_id.get(str(x).lower().strip(), x) if pd.notna(x) and str(x).strip() else ''
+                        )
+                    
+                    # Vincular ID FILHO (se veio como nome)
+                    if 'ID FILHO' in df_saida.columns:
+                        df_saida['ID FILHO'] = df_saida['ID FILHO'].apply(
+                            lambda x: mapa_nome_id.get(str(x).lower().strip(), x) if pd.notna(x) and str(x).strip() else ''
+                        )
+                    
+                    st.info(f"🔗 IDs vinculados com base em {len(mapa_nome_id)} cadastros de referência.")
+            
             if tipo == 'projetos' and 'ID DO CADASTRO' in df_saida.columns:
                 from conversor import _encontrar_coluna
                 col_cliente_origem = _encontrar_coluna(

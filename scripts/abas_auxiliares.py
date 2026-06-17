@@ -470,6 +470,7 @@ def gerar_excel_completo(
         # Aba principal: dados para importação
         nome_aba_principal = {
             'contatos': 'Cadastro',
+            'contatos_relacionados': 'Contatos Relacionados',
             'projetos': 'Projetos',
             'financeiro': 'Financeiro',
             'horas': 'Horas',

@@ -158,6 +158,7 @@ def carregar_modelo(tipo: str) -> list:
     """Carrega as colunas do modelo padrão a partir da planilha."""
     mapa_arquivos = {
         'contatos': 'doit-modelo-contatos.xlsx',
+        'contatos_relacionados': 'doit-modelo-contatos-relacionados.xlsx',
         'projetos': 'doit-modelo-projetos.xlsx',
         'financeiro': 'doit-modelo-financeiro.xlsx',
         'horas': 'doit-modelo-horas-trabalhadas.xlsx',
@@ -231,6 +232,7 @@ MAPEAMENTOS = {
         'usuarios': {},
         'produtos': {},
         'vendas': {},
+        'contatos_relacionados': {},
     },
     'sienge': {
         'contatos': {
@@ -285,6 +287,7 @@ MAPEAMENTOS = {
         'usuarios': {},
         'produtos': {},
         'vendas': {},
+        'contatos_relacionados': {},
     },
     'trello': {
         'contatos': {
@@ -317,6 +320,7 @@ MAPEAMENTOS = {
         'usuarios': {},
         'produtos': {},
         'vendas': {},
+        'contatos_relacionados': {},
     },
     'outlook': {
         'contatos': {
@@ -344,6 +348,7 @@ MAPEAMENTOS = {
         'usuarios': {},
         'produtos': {},
         'vendas': {},
+        'contatos_relacionados': {},
     },
     'excel_manual': {
         # Para Excel manual, tentamos mapear por similaridade de nomes
@@ -354,6 +359,7 @@ MAPEAMENTOS = {
         'usuarios': {},
         'produtos': {},
         'vendas': {},
+        'contatos_relacionados': {},
     },
     'financeiro_horizontal': {
         'contatos': {},
@@ -373,6 +379,7 @@ MAPEAMENTOS = {
         'usuarios': {},
         'produtos': {},
         'vendas': {},
+        'contatos_relacionados': {},
     },
     'excel_desestruturado': {
         'contatos': {
@@ -416,6 +423,14 @@ MAPEAMENTOS = {
         'usuarios': {},
         'produtos': {},
         'vendas': {},
+        'contatos_relacionados': {
+            'ID PAI': ['ID PAI', 'Id Pai', 'id_pai', 'Empresa', 'Pai', 'ID Empresa'],
+            'ID FILHO': ['ID FILHO', 'Id Filho', 'id_filho', 'Contato', 'Filho', 'ID Contato'],
+            'NOME FILHO': ['NOME FILHO', 'Nome Filho', 'Nome', 'Contato'],
+            'EMAIL FILHO': ['EMAIL FILHO', 'Email Filho', 'Email', 'E-mail'],
+            'RELAÇÃO FILHO PAI': ['RELAÇÃO FILHO PAI', 'Relação Filho Pai', 'Relação', 'Cargo', 'Função'],
+            'RELAÇÃO PAI FILHO': ['RELAÇÃO PAI FILHO', 'Relação Pai Filho', 'Empresa que Trabalha', 'Empresa'],
+        },
     },
     'conta_azul': {
         'contatos': {
@@ -458,6 +473,7 @@ MAPEAMENTOS = {
         'usuarios': {},
         'produtos': {},
         'vendas': {},
+        'contatos_relacionados': {},
     },
     'omie': {
         'contatos': {
@@ -498,6 +514,7 @@ MAPEAMENTOS = {
         'usuarios': {},
         'produtos': {},
         'vendas': {},
+        'contatos_relacionados': {},
     },
     'navis': {
         'contatos': {
@@ -549,6 +566,7 @@ MAPEAMENTOS = {
         'usuarios': {},
         'produtos': {},
         'vendas': {},
+        'contatos_relacionados': {},
     },
     'doit_coleta': {
         'contatos': {
@@ -630,6 +648,7 @@ MAPEAMENTOS = {
         },
         'produtos': {},
         'vendas': {},
+        'contatos_relacionados': {},
     },
 }
 
