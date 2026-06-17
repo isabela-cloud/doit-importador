@@ -1070,6 +1070,22 @@ if uploaded_file is not None:
     if valores_manuais:
         st.info(f"📝 **{len(valores_manuais)} campo(s) serão preenchidos manualmente:** {', '.join(f'{k}={v}' for k,v in valores_manuais.items())}")
     
+    # Auto-completar categorias financeiras (hierarquia 3 níveis)
+    auto_completar_categorias = False
+    if tipo == 'financeiro' and 'categorias_financeiro' in padronizacoes:
+        st.markdown("---")
+        st.markdown('<div class="section-header">🧩 Auto-completar Categorias</div>', unsafe_allow_html=True)
+        st.caption(
+            "Se o cliente preencheu apenas 1 ou 2 níveis da categoria, "
+            "o sistema pode completar os demais automaticamente com base no plano de contas."
+        )
+        auto_completar_categorias = st.checkbox(
+            "✅ Auto-completar hierarquia de categorias (1ª, 2ª e 3ª)",
+            value=True,
+            help="Quando ativado, se o cliente preencheu 'Aluguel' na 3ª categoria, "
+                 "o sistema preenche automaticamente '1ª = Despesas Fixas' e '2ª = Ocupação'"
+        )
+    
     st.markdown("---")
     
     # ============================================================
@@ -1139,6 +1155,95 @@ if uploaded_file is not None:
                     # Só preencher onde está vazio
                     mask = df_saida[campo].apply(lambda x: pd.isna(x) or str(x).strip() == '')
                     df_saida.loc[mask, campo] = valor
+            
+            # Auto-completar hierarquia de categorias financeiras
+            if tipo == 'financeiro' and auto_completar_categorias and 'categorias_financeiro' in padronizacoes:
+                cat_linhas = padronizacoes['categorias_financeiro']
+                
+                # Construir índices de busca
+                # nivel3 → [(nivel1, nivel2, nivel3), ...]
+                # nivel2 → [(nivel1, nivel2), ...]
+                # nivel1 → [nivel1, ...]
+                arvore_por_n3 = {}  # nome_lower → lista de (n1, n2, n3)
+                arvore_por_n2 = {}  # nome_lower → lista de (n1, n2)
+                arvore_por_n1 = set()
+                
+                for linha in cat_linhas:
+                    partes = [p.strip() for p in linha.split('>')]
+                    n1 = partes[0] if len(partes) >= 1 else ''
+                    n2 = partes[1] if len(partes) >= 2 else ''
+                    n3 = partes[2] if len(partes) >= 3 else ''
+                    
+                    if n1:
+                        arvore_por_n1.add(n1.lower())
+                    if n2:
+                        arvore_por_n2.setdefault(n2.lower(), []).append((n1, n2))
+                    if n3:
+                        arvore_por_n3.setdefault(n3.lower(), []).append((n1, n2, n3))
+                
+                completados = 0
+                for idx in df_saida.index:
+                    cat1 = str(df_saida.at[idx, '1ª CATEGORIA']).strip() if '1ª CATEGORIA' in df_saida.columns and pd.notna(df_saida.at[idx, '1ª CATEGORIA']) else ''
+                    cat2 = str(df_saida.at[idx, '2ª CATEGORIA']).strip() if '2ª CATEGORIA' in df_saida.columns and pd.notna(df_saida.at[idx, '2ª CATEGORIA']) else ''
+                    cat3 = str(df_saida.at[idx, '3ª CATEGORIA']).strip() if '3ª CATEGORIA' in df_saida.columns and pd.notna(df_saida.at[idx, '3ª CATEGORIA']) else ''
+                    
+                    # Se já tem os 3 preenchidos, não mexer
+                    if cat1 and cat2 and cat3:
+                        continue
+                    
+                    # Se tem apenas nível 3, buscar 1 e 2
+                    if cat3 and not cat1 and not cat2:
+                        matches = arvore_por_n3.get(cat3.lower(), [])
+                        if len(matches) == 1:
+                            df_saida.at[idx, '1ª CATEGORIA'] = matches[0][0]
+                            df_saida.at[idx, '2ª CATEGORIA'] = matches[0][1]
+                            completados += 1
+                        elif len(matches) > 1:
+                            # Ambiguidade - usar o primeiro match
+                            df_saida.at[idx, '1ª CATEGORIA'] = matches[0][0]
+                            df_saida.at[idx, '2ª CATEGORIA'] = matches[0][1]
+                            completados += 1
+                    
+                    # Se tem nível 2 mas não 1, buscar 1
+                    elif cat2 and not cat1:
+                        matches = arvore_por_n2.get(cat2.lower(), [])
+                        if len(matches) >= 1:
+                            df_saida.at[idx, '1ª CATEGORIA'] = matches[0][0]
+                            completados += 1
+                            # Se também não tem nível 3, tentar completar
+                            if not cat3:
+                                # Procurar se há apenas um nível 3 para esse n1>n2
+                                n3_possiveis = [t[2] for t in arvore_por_n3.values() 
+                                               for t2 in [t] if len(t2) > 0 
+                                               for t in t2
+                                               if t[0].lower() == matches[0][0].lower() and t[1].lower() == cat2.lower() and t[2]]
+                                if len(n3_possiveis) == 1:
+                                    df_saida.at[idx, '3ª CATEGORIA'] = n3_possiveis[0]
+                    
+                    # Se tem nível 1 e 2 mas não 3, buscar 3
+                    elif cat1 and cat2 and not cat3:
+                        for linha in cat_linhas:
+                            partes = [p.strip() for p in linha.split('>')]
+                            if len(partes) >= 3 and partes[0].lower() == cat1.lower() and partes[1].lower() == cat2.lower() and partes[2]:
+                                # Se há apenas uma opção de nível 3, preencher
+                                n3_opcoes = [p.strip() for p2 in cat_linhas 
+                                            for p in [p2.split('>')] 
+                                            if len(p) >= 3 and p[0].strip().lower() == cat1.lower() and p[1].strip().lower() == cat2.lower() and p[2].strip()]
+                                if len(n3_opcoes) == 1:
+                                    df_saida.at[idx, '3ª CATEGORIA'] = partes[2]
+                                    completados += 1
+                                break
+                    
+                    # Se tem apenas nível 1, buscar 2 (só se único)
+                    elif cat1 and not cat2:
+                        n2_opcoes = [t[1] for matches_list in arvore_por_n2.values() for t in matches_list if t[0].lower() == cat1.lower()]
+                        n2_unicos = list(set(n2_opcoes))
+                        if len(n2_unicos) == 1:
+                            df_saida.at[idx, '2ª CATEGORIA'] = n2_unicos[0]
+                            completados += 1
+                
+                if completados > 0:
+                    st.success(f"🧩 **{completados} registro(s)** tiveram categorias auto-completadas pelo plano de contas.")
             
             # Campos extras → Anotações (dados preenchidos que não foram mapeados)
             from conversor import _campos_extras_para_anotacoes
