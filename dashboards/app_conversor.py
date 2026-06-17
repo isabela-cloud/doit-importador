@@ -321,7 +321,7 @@ st.sidebar.markdown("""
 # ÁREA PRINCIPAL
 # ============================================================
 st.title("🔄 Conversor de Dados")
-st.markdown(f'<div class="info-box">📦 Transforme planilhas de qualquer sistema para o padrão de importação DOit.</div>', unsafe_allow_html=True)
+st.caption("Conversão padronizada de planilhas para importação no DOit.")
 
 # Upload do arquivo
 st.divider()
@@ -1726,8 +1726,8 @@ if uploaded_file is not None:
         )
 
 else:
-    # Estado inicial - mostrar informações dos modelos
-    st.markdown('<div class="info-box">👆 Faça upload de um arquivo para começar a conversão.</div>', unsafe_allow_html=True)
+    # Estado inicial
+    st.markdown("")
     
     st.divider()
     
