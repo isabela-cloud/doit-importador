@@ -172,7 +172,7 @@ st.sidebar.title("⚙️ Configuração")
 
 # Seleção do tipo de dado
 tipo_opcoes = {
-    'Contatos / Pessoas': 'contatos',
+    'Cadastros': 'contatos',
     'Contatos Relacionados': 'contatos_relacionados',
     'Projetos': 'projetos',
     'Financeiro': 'financeiro',
